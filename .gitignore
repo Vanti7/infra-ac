@@ -1,0 +1,21 @@
+# Secrets — ne jamais committer
+*.secret.yaml
+*.secret.env
+secrets/
+.env
+.env.*
+
+# Clés / tokens
+*.age
+age-keys.txt
+*token*
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
+# Divers
+.DS_Store

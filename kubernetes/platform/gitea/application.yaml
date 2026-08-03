@@ -11,6 +11,12 @@ spec:
     targetRevision: 12.7.0
     helm:
       values: |
+        # RWO unique + verrou LevelDB (queues) : Recreate obligatoire, sinon
+        # l'ancien et le nouveau pod se chevauchent brièvement (RollingUpdate
+        # par défaut du chart) et le nouveau pod ne peut pas prendre le verrou.
+        strategy:
+          type: Recreate
+
         persistence:
           size: 10Gi
 

@@ -35,7 +35,10 @@ spec:
               DOMAIN: localhost
               ROOT_URL: http://localhost:3000/
             database:
-              DB_TYPE: sqlite3
+              DB_TYPE: postgres
+              HOST: "gitea-postgresql:5432"
+              NAME: gitea
+              USER: gitea
             session:
               PROVIDER: memory
             cache:
@@ -44,6 +47,16 @@ spec:
               TYPE: level
             packages:
               ENABLED: true
+
+        # Le mot de passe DB n'est jamais dans les values (donc jamais dans git) :
+        # injecté par variable d'env depuis un Secret créé hors Git (cf. workflow).
+        deployment:
+          env:
+            - name: GITEA__database__PASSWD
+              valueFrom:
+                secretKeyRef:
+                  name: gitea-db-secret
+                  key: password
   destination:
     server: https://kubernetes.default.svc
     namespace: gitea

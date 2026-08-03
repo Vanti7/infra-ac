@@ -49,9 +49,13 @@ succès pour Keycloak). Patch dans `gandiclient.go` (`doRequest`) :
 
 ## Registre
 
-Poussée vers le registre Gitea interne (Phase 6, `kubernetes/platform/gitea/`) :
-`10.42.0.11:30300/gitea_admin/cert-manager-webhook-gandi:0.2.0-aetheris`
+Poussée vers Harbor (`kubernetes/platform/harbor/`), projet `aetheriscloud` :
+`10.42.0.11:30002/aetheriscloud/cert-manager-webhook-gandi:0.2.1-aetheris`
+
+(Initialement poussée vers le registre Gitea le temps de la Phase 6 — Gitea
+garde son rôle Git, Harbor a pris le rôle de registre de conteneurs juste
+après, l'utilisateur ayant plusieurs autres apps à héberger.)
 
 Les nœuds k3s ont `/etc/rancher/k3s/registries.yaml` (rôles Ansible
-`k3s-adm`/`k3s-agent`) configuré pour accepter ce registre en plain HTTP
+`k3s-adm`/`k3s-agent`) configuré pour accepter Gitea et Harbor en plain HTTP
 (pas de TLS en interne, accès WG/cluster uniquement).

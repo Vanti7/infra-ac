@@ -170,21 +170,42 @@
 
 ## Phase 7 — Multi-tenancy et onboarding client
 
+> ⚠ **Version légère mise en place en avance de phase**, à la demande explicite de l'utilisateur ("Met en place une vitrine, on fera évoluer si trop de client à moyen/long terme") pendant les travaux de Phase 6. Le chart et l'ApplicationSet sont réels et fonctionnels ; ce qui reste en `[ ]` (kubeconfig livré à un vrai client, revue au-delà d'un client de test) attend simplement l'arrivée d'un premier vrai client.
+
 ### 7.1 Chart `onboarding-client`
-- [ ] Template namespace `cust-<nom>` avec labels PSA `restricted`
-- [ ] Template RoleBinding groupe Keycloak → ClusterRole `edit` (jamais admin/cluster-admin)
-- [ ] Template ResourceQuota (cpu/mémoire/pods/PVC/storage)
-- [ ] Template LimitRange (defaults + max par conteneur)
-- [ ] Template NetworkPolicies (default-deny + allow intra-ns + DNS + ingress Traefik)
+- [x] Template namespace `cust-<nom>` avec labels PSA `restricted` (+ `aetheriscloud.fr/tier: tenant`)
+- [x] Template RoleBinding groupe Keycloak (`oidc:client-<nom>`) → ClusterRole `edit` (jamais admin/cluster-admin)
+- [x] Template ResourceQuota (cpu/mémoire/pods/PVC/storage — valeurs du plan par défaut, surchageables par client via values)
+- [x] Template LimitRange (defaults + max par conteneur)
+- [x] Template NetworkPolicy — ⚠ **déviation** : le plan décrit 4 policies séparées (default-deny + 3 allow) ; **une seule** consolidée à la place. Trouvé en validant le client de test : kube-router (moteur netpol de k3s) n'unit pas correctement plusieurs objets `NetworkPolicy` ciblant les mêmes pods — même le trafic intra-namespace censé être autorisé se faisait refuser (`connection refused`). Un seul objet combinant toutes les règles fonctionne correctement
+- [x] **Hors plan** : `kubernetes/bootstrap/tenants-appset.yaml`, un `ApplicationSet` (générateur git `files` sur `kubernetes/tenants/*.values.yaml`) plutôt qu'une Application par client créée à la main — ajouter un client = ajouter un fichier de values, ArgoCD fait le reste
 
 ### 7.2 Onboarding d'un client test (`cust-test`)
-- [ ] Créer groupe `client-test` + user(s) MFA dans Keycloak
-- [ ] Créer `kubernetes/tenants/test.values.yaml` → PR → merge → sync ArgoCD
-- [ ] Livrer le kubeconfig type (exec plugin oidc-login)
+- [x] Groupe `client-test` + user `cust-test-user` (MFA en required action) créés dans Keycloak
+- [x] `kubernetes/tenants/test.values.yaml` créé → poussé directement sur `main` (pas de vraie PR, solo pour l'instant) → sync ArgoCD automatique
+- [ ] Livrer le kubeconfig type (exec plugin oidc-login) — pas fait, pas de vrai client pour l'instant
 
-**✅ Validation** : `kubectl auth can-i --list -n cust-test` montre `edit` · `kubectl get ns` interdit · `kubectl get pods -n kube-system` interdit · quota/LimitRange déclenchés correctement · netpol isole le namespace · pod privilégié rejeté par PSA
+**✅ Validation** (testée avec `--as-group=oidc:client-test`, admin kubectl) :
+- [x] `kubectl auth can-i --list -n cust-test` montre `edit` (pods/services/deployments/... en create/delete/get/list/patch/update/watch)
+- [x] `kubectl auth can-i list namespaces` / `list pods -n kube-system` → **interdit**, confirmé
+- [x] LimitRange déclenché correctement : un pod sans requests explicites reçoit automatiquement `requests: {cpu:100m, memory:128Mi}` / `limits: {cpu:500m, memory:512Mi}`
+- [x] Pod privilégié → rejeté par PSA `restricted` (confirmé : `privileged`, `allowPrivilegeEscalation`, capabilities, `runAsNonRoot`, `seccompProfile` tous exigés)
+- [x] Netpol isole le namespace : intra-namespace autorisé, cross-namespace (`aetheris-apps` → `cust-test`) refusé, egress DNS vers `kube-system` fonctionnel — revalidé après le fix de consolidation ci-dessus (⚠ le premier test avec un pod `nginx:alpine` a d'abord donné un faux négatif : nginx crashait sous PSA restricted — `mkdir /var/cache/nginx/client_temp: Permission denied` — sans rapport avec le netpol ; retesté avec un serveur `busybox httpd`, PSA-compatible)
 
 > 📌 Rappel : au-delà de 2-3 clients, évaluer la bascule vers **Capsule**.
+
+---
+
+## Hors plan — Accès distant : Teleport `app_service` + portail `aetheriscloud.fr`
+
+Décidé en cours de Phase 6/7 à la place du portail self-service WireGuard initialement envisagé (jugé trop sensible : gestion dynamique de peers VPN = surface d'attaque réseau, pas juste applicative).
+
+- [x] `app_service` activé sur `teleport-kube-agent` (rôles `kube,app` — rejoin avec un nouveau token nécessaire, l'agent n'a pas de PVC d'identité donc le rejoin est immédiat au redémarrage du pod) : Vault, ArgoCD, Harbor, Grafana, Gitea proxifiés sous `<nom>.teleport.aetheriscloud.fr`
+- [x] DNS wildcard `*.teleport.aetheriscloud.fr` ajouté (Gandi) + règle HAProxy `req_ssl_sni -m end -i .teleport.aetheriscloud.fr` → `bk_teleport`. Vérifié en HTTPS externe : redirection correcte vers la page de login Teleport
+- [x] ⚠ **Limite Teleport Community trouvée** : `tctl get oidc` fonctionne (liste vide) mais `tctl create` sur un connecteur OIDC échoue (`OIDC is only available in Teleport Enterprise`) — pas de SSO Keycloak possible sur Teleport lui-même sans licence payante. Décision utilisateur : garder les comptes Teleport locaux (WebAuthn, déjà en place depuis la Phase 4) — un compte par personne ayant besoin d'accéder aux outils, comme `vanti` aujourd'hui. Double authentification donc (Keycloak pour le portail, Teleport local pour l'accès aux outils via `app_service`), assumé
+- [x] **Portail `aetheriscloud.fr`** (`apps/portal/`, FastAPI + OIDC Keycloak natif, PAS via Teleport) : dashboard listant les outils accessibles selon le groupe Keycloak de l'utilisateur, plutôt que d'exposer directement les URLs Teleport brutes. Buildé via `podman` sur `k3s-w1` (même méthode que le webhook Gandi), déployé namespace `portal` (tier `internal`, PSA `restricted`). Certificate cert-manager dédié pour l'apex `aetheriscloud.fr` (hors du wildcard `*.apps`, SAN séparée) — routage HAProxy déjà couvert par le `default_backend bk_ingress` existant, aucune règle supplémentaire nécessaire
+  - ⚠ Version scoped-down du "Portail client" prévu en Phase 11 du plan, codée directement dans ce repo (`apps/portal/`) plutôt que dans un repo séparé `client-portal` comme prévu — à réévaluer si ça grossit vers le vrai portail multi-tenant (tickets, self-service namespace, NetBox…)
+- [x] Client Keycloak `teleport` créé (confidentiel, mapper `groups`) — actuellement inutilisé faute de support OIDC côté Teleport Community, gardé au cas où une bascule Enterprise serait décidée plus tard
 
 ---
 

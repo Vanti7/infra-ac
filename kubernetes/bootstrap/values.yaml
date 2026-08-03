@@ -1,0 +1,33 @@
+global:
+  domain: localhost:8080
+
+configs:
+  params:
+    server.insecure: "true"
+
+  cm:
+    url: "http://localhost:8080"
+    oidc.config: |
+      name: Keycloak
+      issuer: https://sso.aetheriscloud.fr/realms/infra
+      clientID: argocd
+      clientSecret: $argocd-secret:oidc.keycloak.clientSecret
+      requestedScopes:
+        - openid
+        - profile
+        - email
+        - groups
+
+  rbac:
+    policy.csv: |
+      g, oidc:infra-admins, role:admin
+    policy.default: role:readonly
+
+dex:
+  enabled: false
+
+server:
+  service:
+    type: ClusterIP
+  ingress:
+    enabled: false

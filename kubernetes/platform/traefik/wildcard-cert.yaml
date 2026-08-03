@@ -8,9 +8,14 @@ spec:
   issuerRef:
     name: gandi-dns01
     kind: ClusterIssuer
+  # Uniquement le wildcard : "apps.aetheriscloud.fr" (apex, sans wildcard)
+  # partagerait le même enregistrement TXT _acme-challenge.apps que le
+  # wildcard, or le webhook Gandi (implémentation simple, une seule valeur
+  # par rrset) écrase plutôt que de faire coexister les deux valeurs de
+  # challenge — les deux validations se marchent dessus. Pas requis par le
+  # plan (seul *.apps.aetheriscloud.fr l'est).
   dnsNames:
     - "*.apps.aetheriscloud.fr"
-    - "apps.aetheriscloud.fr"
 ---
 apiVersion: traefik.io/v1alpha1
 kind: TLSStore

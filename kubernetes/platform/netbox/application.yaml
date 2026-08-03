@@ -1,0 +1,53 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: netbox
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.netbox.oss.netboxlabs.com/
+    chart: netbox
+    targetRevision: 8.3.47
+    helm:
+      values: |
+        # netbox.aetheriscloud.fr résout en public vers l'IP privée 10.42.0.11
+        # (même pattern que Harbor, cf. workflow) : le plan prévoyait Traefik +
+        # ipAllowList (10.99.0.0/24, 10.42.0.0/24), mais avec notre WireGuard en
+        # split-tunnel le trafic vers un hostname public ne passe jamais par le
+        # tunnel — Traefik verrait notre IP publique réelle, pas notre IP WG, et
+        # bloquerait tout le monde. Accès direct par NodePort à la place.
+        service:
+          type: NodePort
+          nodePort: 30004
+
+        superuser:
+          existingSecret: netbox-superuser
+
+        postgresql:
+          enabled: true
+          auth:
+            existingSecretName: netbox-postgresql
+
+        remoteAuth:
+          enabled: true
+          backends:
+            - social_core.backends.open_id_connect.OpenIdConnectAuth
+
+        extraConfig:
+          - secret:
+              secretName: netbox-sso-config
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            memory: 1Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: netbox
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

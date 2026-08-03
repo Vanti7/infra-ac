@@ -14,8 +14,13 @@ spec:
         deployment:
           replicas: 2
         ports:
+          web:
+            proxyProtocol:
+              trustedIPs: ["10.42.0.1/32"]
           websecure:
             hostPort: 443
+            proxyProtocol:
+              trustedIPs: ["10.42.0.1/32"]
         service:
           spec:
             type: ClusterIP

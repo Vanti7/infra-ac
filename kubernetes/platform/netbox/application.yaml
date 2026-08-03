@@ -34,9 +34,19 @@ spec:
           backends:
             - social_core.backends.open_id_connect.OpenIdConnectAuth
 
-        extraConfig:
-          - secret:
+        # `extraConfig` (mécanisme documenté par le chart) ne fonctionne pas avec
+        # cette image : le loader de config de NetBox (netbox/configuration.py)
+        # ne scanne que /etc/netbox/config/*.py, pas les .yaml montés ailleurs
+        # par extraConfig. Montage direct à la place, en Python valide.
+        extraVolumes:
+          - name: sso-config
+            secret:
               secretName: netbox-sso-config
+        extraVolumeMounts:
+          - name: sso-config
+            mountPath: /etc/netbox/config/990-sso.py
+            subPath: sso.py
+            readOnly: true
 
         resources:
           requests:

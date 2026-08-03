@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: client-quota
+  namespace: cust-{{ .Values.name }}
+spec:
+  hard:
+    requests.cpu: {{ .Values.quota.requestsCpu | quote }}
+    requests.memory: {{ .Values.quota.requestsMemory | quote }}
+    limits.cpu: {{ .Values.quota.limitsCpu | quote }}
+    limits.memory: {{ .Values.quota.limitsMemory | quote }}
+    pods: {{ .Values.quota.pods | quote }}
+    persistentvolumeclaims: {{ .Values.quota.pvcs | quote }}
+    requests.storage: {{ .Values.quota.requestsStorage | quote }}

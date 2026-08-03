@@ -1,0 +1,5 @@
+apiVersion: v2
+name: onboarding-client
+description: Namespace + RBAC + quotas + isolation réseau pour un client (Phase 7)
+type: application
+version: 0.1.0

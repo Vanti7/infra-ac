@@ -1,0 +1,25 @@
+# Nom du client : détermine le namespace (cust-<name>) et le groupe Keycloak
+# attendu (client-<name>), créé séparément via l'API admin Keycloak.
+name: ""
+
+quota:
+  requestsCpu: "2"
+  requestsMemory: 4Gi
+  limitsCpu: "3"
+  limitsMemory: 6Gi
+  pods: "30"
+  pvcs: "5"
+  requestsStorage: 20Gi
+
+limitRange:
+  defaultRequestCpu: 100m
+  defaultRequestMemory: 128Mi
+  defaultLimitCpu: 500m
+  defaultLimitMemory: 512Mi
+  maxCpu: "1"
+  maxMemory: 2Gi
+
+# Namespace où tourne l'ingress (pour l'allow NetworkPolicy) et kube-system
+# (pour l'allow DNS) — fixes dans cette infra, pas besoin de les paramétrer
+# par client.
+traefikNamespace: traefik

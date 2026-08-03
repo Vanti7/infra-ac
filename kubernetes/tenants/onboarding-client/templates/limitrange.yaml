@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: client-limits
+  namespace: cust-{{ .Values.name }}
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: {{ .Values.limitRange.defaultRequestCpu }}
+        memory: {{ .Values.limitRange.defaultRequestMemory }}
+      default:
+        cpu: {{ .Values.limitRange.defaultLimitCpu }}
+        memory: {{ .Values.limitRange.defaultLimitMemory }}
+      max:
+        cpu: {{ .Values.limitRange.maxCpu | quote }}
+        memory: {{ .Values.limitRange.maxMemory }}

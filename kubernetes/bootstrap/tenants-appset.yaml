@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: tenants
+  namespace: argocd
+spec:
+  generators:
+    - git:
+        repoURL: git@github.com:Vanti7/infra-ac.git
+        revision: main
+        files:
+          - path: "kubernetes/tenants/*.values.yaml"
+  template:
+    metadata:
+      name: "tenant-{{name}}"
+    spec:
+      project: default
+      source:
+        repoURL: git@github.com:Vanti7/infra-ac.git
+        targetRevision: main
+        path: kubernetes/tenants/onboarding-client
+        helm:
+          parameters:
+            - name: name
+              value: "{{name}}"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "cust-{{name}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true

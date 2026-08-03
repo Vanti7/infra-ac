@@ -22,7 +22,7 @@ TOOLS = [
     {"name": "ArgoCD", "description": "GitOps / déploiements", "url": "https://argocd.teleport.aetheriscloud.fr", "group": "infra-admins"},
     # Harbor n'est pas derrière Teleport (son externalURL sert aussi à l'auth
     # registre pour containerd — cf. workflow) : accès direct, WG uniquement.
-    {"name": "Harbor", "description": "Registre de conteneurs (WG requis)", "url": "http://10.42.0.11:30002", "group": "infra-admins"},
+    {"name": "Harbor", "description": "Registre de conteneurs (WG requis)", "url": "http://harbor.aetheriscloud.fr:30002", "group": "infra-admins"},
     {"name": "Grafana", "description": "Monitoring", "url": "https://grafana.teleport.aetheriscloud.fr", "group": "infra-admins"},
     {"name": "Gitea", "description": "Git", "url": "https://gitea.teleport.aetheriscloud.fr", "group": "infra-admins"},
     {"name": "Teleport", "description": "Accès SSH / Kubernetes (tsh)", "url": "https://teleport.aetheriscloud.fr", "group": None},

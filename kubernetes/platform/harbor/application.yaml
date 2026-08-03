@@ -26,7 +26,11 @@ spec:
               http:
                 nodePort: 30002
 
-        externalURL: http://10.42.0.11:30002
+        # harbor.aetheriscloud.fr résout en public vers l'IP privée 10.42.0.11
+        # (voir workflow) : nom plus lisible que l'IP:port, mais reste
+        # strictement injoignable hors WG/LAN (personne ne route vers une IP
+        # privée sans y être), donc pas d'exposition supplémentaire.
+        externalURL: http://harbor.aetheriscloud.fr:30002
 
         existingSecretAdminPassword: harbor-admin-secret
         existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD

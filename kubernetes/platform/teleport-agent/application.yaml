@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: teleport-kube-agent
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://charts.releases.teleport.dev
+    chart: teleport-kube-agent
+    targetRevision: 18.10.3
+    helm:
+      values: |
+        kubeClusterName: dedibox
+        roles: kube
+        proxyAddr: teleport.aetheriscloud.fr:443
+        # Jeton généré via `tctl tokens add --type=kube`, TTL 1h : injecté hors Git
+        # dans le Secret teleport-kube-agent-join-token (namespace teleport-agent).
+        joinTokenSecret:
+          create: false
+          name: teleport-kube-agent-join-token
+        updater:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: teleport-agent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

@@ -1,0 +1,66 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 88.1.3
+    helm:
+      values: |
+        # node_exporter est déjà déployé par Ansible (rôle base) sur les 5 hôtes/CT,
+        # en hostNetwork sur :9100 — le DaemonSet du chart entrerait en conflit de
+        # port. On le désactive et on scrape les 5 en statique à la place.
+        nodeExporter:
+          enabled: false
+
+        prometheus:
+          prometheusSpec:
+            retention: 10d
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                memory: 1Gi
+            additionalScrapeConfigs:
+              - job_name: node-exporter-hosts
+                static_configs:
+                  - targets:
+                      - "10.42.0.1:9100"   # hôte PVE
+                      - "10.42.0.5:9100"   # CT teleport
+                      - "10.42.0.6:9100"   # CT iam
+                      - "10.42.0.11:9100"  # k3s-adm
+                      - "10.42.0.21:9100"  # k3s-w1
+                      - "10.42.0.22:9100"  # k3s-w2
+
+        alertmanager:
+          alertmanagerSpec:
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+
+        grafana:
+          admin:
+            existingSecret: grafana-admin-secret
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          service:
+            type: ClusterIP
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

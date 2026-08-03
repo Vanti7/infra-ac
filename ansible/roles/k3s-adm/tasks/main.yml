@@ -1,0 +1,65 @@
+- name: Vérifier si k3s est déjà installé
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_installed
+
+- name: Créer le dossier de config k3s
+  file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+
+- name: Déployer /etc/rancher/k3s/config.yaml
+  template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: "0600"
+  notify: redémarrer k3s
+
+- name: Télécharger le script d'installation k3s
+  get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: "0755"
+  when: not k3s_installed.stat.exists
+
+- name: Installer k3s (server)
+  command: /tmp/k3s-install.sh
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+  when: not k3s_installed.stat.exists
+
+- name: Démarrer et activer k3s
+  systemd:
+    name: k3s
+    state: started
+    enabled: true
+
+- name: Créer le dossier local pour le kubeconfig
+  file:
+    path: "{{ kubeconfig_local_path | dirname }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+  become: false
+
+- name: Récupérer le kubeconfig admin
+  fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ kubeconfig_local_path }}"
+    flat: true
+
+- name: Remplacer l'URL locale par l'URL WG dans le kubeconfig
+  replace:
+    path: "{{ kubeconfig_local_path }}"
+    regexp: 'https://127\.0\.0\.1:6443'
+    replace: "{{ k3s_server_url }}"
+  delegate_to: localhost
+  become: false
+
+- name: Restreindre les permissions du kubeconfig local
+  file:
+    path: "{{ kubeconfig_local_path }}"
+    mode: "0600"
+  delegate_to: localhost
+  become: false

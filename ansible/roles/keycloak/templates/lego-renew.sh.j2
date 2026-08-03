@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+export GANDIV5_PERSONAL_ACCESS_TOKEN="{{ gandi_api_token }}"
+/usr/local/bin/lego run \
+  --accept-tos \
+  --path {{ lego_home }} \
+  --email {{ acme_email }} \
+  --dns gandiv5 \
+  --dns.resolvers 8.8.8.8:53,1.1.1.1:53 \
+  --domains {{ sso_domain }} \
+  --renew-days 30 \
+  --deploy-hook "systemctl reload nginx"

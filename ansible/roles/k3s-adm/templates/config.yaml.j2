@@ -1,0 +1,20 @@
+token: "{{ k3s_token }}"
+disable:
+  - traefik
+  - servicelb
+node-taint:
+  - "node-role.kubernetes.io/control-plane=true:NoSchedule"
+tls-san:
+{% for san in k3s_tls_san %}
+  - "{{ san }}"
+{% endfor %}
+secrets-encryption: true
+cluster-cidr: "{{ k3s_cluster_cidr }}"
+service-cidr: "{{ k3s_service_cidr }}"
+kube-apiserver-arg:
+  - "oidc-issuer-url={{ k3s_oidc_issuer_url }}"
+  - "oidc-client-id={{ k3s_oidc_client_id }}"
+  - "oidc-username-claim=preferred_username"
+  - "oidc-username-prefix=oidc:"
+  - "oidc-groups-claim=groups"
+  - "oidc-groups-prefix=oidc:"

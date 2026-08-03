@@ -1,0 +1,4 @@
+- name: redémarrer teleport
+  systemd:
+    name: teleport
+    state: restarted

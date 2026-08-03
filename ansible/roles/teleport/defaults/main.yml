@@ -1,0 +1,4 @@
+teleport_domain: teleport.aetheriscloud.fr
+teleport_cluster_name: dedibox.aetheriscloud.fr
+acme_email: admin@aetheriscloud.fr
+teleport_apt_codename: trixie

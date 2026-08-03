@@ -1,0 +1,14 @@
+[Unit]
+Description=Keycloak
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=keycloak
+Group=keycloak
+ExecStart={{ keycloak_home }}/bin/kc.sh start --optimized
+Restart=on-failure
+LimitNOFILE=102642
+
+[Install]
+WantedBy=multi-user.target

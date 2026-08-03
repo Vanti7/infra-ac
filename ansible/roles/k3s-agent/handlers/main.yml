@@ -1,0 +1,4 @@
+- name: redémarrer k3s-agent
+  systemd:
+    name: k3s-agent
+    state: restarted

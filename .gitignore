@@ -19,3 +19,5 @@ age-keys.txt
 
 # Divers
 .DS_Store
+.venv/
+.claude/

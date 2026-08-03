@@ -1,0 +1,5 @@
+# Copier en terraform.tfvars (gitignored) et adapter.
+# proxmox_api_token ne va JAMAIS ici : export TF_VAR_proxmox_api_token="terraform@pve!iac=<uuid>"
+
+proxmox_node   = "pve"
+ssh_public_key = "ssh-ed25519 AAAA... admin@poste"

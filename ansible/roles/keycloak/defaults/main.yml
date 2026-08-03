@@ -1,0 +1,11 @@
+keycloak_version: "26.7.0"
+keycloak_home: /opt/keycloak
+keycloak_release_dir: "/opt/keycloak-{{ keycloak_version }}"
+keycloak_db_name: keycloak
+keycloak_db_user: keycloak
+keycloak_admin_user: admin
+
+lego_version: "5.3.1"
+sso_domain: sso.aetheriscloud.fr
+acme_email: admin@aetheriscloud.fr
+lego_home: /etc/lego

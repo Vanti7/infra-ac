@@ -1,0 +1,13 @@
+- name: redémarrer sshd
+  systemd:
+    name: ssh
+    state: restarted
+
+- name: recharger systemd
+  systemd:
+    daemon_reload: true
+
+- name: redémarrer node_exporter
+  systemd:
+    name: node_exporter
+    state: restarted

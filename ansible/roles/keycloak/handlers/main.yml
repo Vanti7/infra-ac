@@ -1,0 +1,19 @@
+- name: recharger systemd
+  systemd:
+    daemon_reload: true
+
+- name: redémarrer keycloak
+  systemd:
+    name: keycloak
+    state: restarted
+
+- name: recharger nginx
+  systemd:
+    name: nginx
+    state: reloaded
+
+- name: activer le timer lego
+  systemd:
+    name: lego-renew.timer
+    state: started
+    enabled: true

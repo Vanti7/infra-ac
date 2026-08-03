@@ -1,0 +1,35 @@
+- name: Socle commun
+  hosts: all
+  become: true
+  roles:
+    - base
+
+- name: IAM Keycloak
+  hosts: iam
+  become: true
+  roles:
+    - keycloak
+
+- name: Bastion Teleport
+  hosts: teleport
+  become: true
+  roles:
+    - teleport
+
+- name: Agents Teleport (ssh_service)
+  hosts: k3s_cluster:iam
+  become: true
+  roles:
+    - teleport-agent
+
+- name: Cluster k3s — control-plane
+  hosts: k3s_server
+  become: true
+  roles:
+    - k3s-adm
+
+- name: Cluster k3s — agents
+  hosts: k3s_agents
+  become: true
+  roles:
+    - k3s-agent

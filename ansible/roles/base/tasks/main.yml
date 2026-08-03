@@ -1,0 +1,89 @@
+- name: Installer les paquets de base
+  apt:
+    name:
+      - curl
+      - vim
+      - htop
+      - unattended-upgrades
+      - chrony
+      - ca-certificates
+    state: present
+    update_cache: true
+
+- name: Activer les mises à jour automatiques de sécurité
+  copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+    mode: "0644"
+
+- name: Démarrer et activer chrony
+  systemd:
+    name: chrony
+    state: started
+    enabled: true
+  when: not is_container
+  # Les LXC non privilégiés partagent l'horloge du noyau hôte et n'ont pas
+  # CAP_SYS_TIME (adjtimex refusé) : chrony n'a rien à y faire.
+
+- name: Désactiver chrony (conteneur, hérite de l'horloge hôte)
+  systemd:
+    name: chrony
+    state: stopped
+    enabled: false
+  when: is_container
+
+- name: "sshd — désactiver l'authentification par mot de passe"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: "PasswordAuthentication no"
+  notify: redémarrer sshd
+
+- name: "sshd — pas de login root par mot de passe"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: "PermitRootLogin prohibit-password"
+  notify: redémarrer sshd
+
+- name: Créer l'utilisateur système node_exporter
+  user:
+    name: node_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Télécharger et extraire node_exporter
+  unarchive:
+    src: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+
+- name: Installer le binaire node_exporter
+  copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    mode: "0755"
+    remote_src: true
+    owner: node_exporter
+    group: node_exporter
+  notify: redémarrer node_exporter
+
+- name: Déployer l'unité systemd node_exporter
+  template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: "0644"
+  notify:
+    - recharger systemd
+    - redémarrer node_exporter
+
+- name: Démarrer et activer node_exporter
+  systemd:
+    name: node_exporter
+    state: started
+    enabled: true
+    daemon_reload: true

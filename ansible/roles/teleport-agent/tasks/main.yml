@@ -1,0 +1,47 @@
+- name: Créer le dossier des keyrings apt
+  file:
+    path: /usr/share/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Vérifier si la clé apt Teleport est déjà présente
+  stat:
+    path: /usr/share/keyrings/teleport-archive-keyring.asc
+  register: teleport_key
+
+- name: Télécharger la clé apt Teleport
+  get_url:
+    url: https://apt.releases.teleport.dev/gpg
+    dest: /usr/share/keyrings/teleport-archive-keyring.asc
+    mode: "0644"
+  when: not teleport_key.stat.exists
+
+- name: Ajouter le dépôt apt Teleport
+  copy:
+    dest: /etc/apt/sources.list.d/teleport.list
+    content: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/debian {{ teleport_apt_codename }} stable/v18\n"
+
+- name: Installer Teleport
+  apt:
+    name: teleport
+    state: present
+    update_cache: true
+
+- name: Vérifier si l'agent a déjà rejoint le cluster
+  stat:
+    path: /var/lib/teleport/host_uuid
+  register: teleport_joined
+
+- name: Déployer /etc/teleport.yaml (join token, seulement au premier join)
+  template:
+    src: teleport.yaml.j2
+    dest: /etc/teleport.yaml
+    mode: "0644"
+  when: not teleport_joined.stat.exists
+  notify: redémarrer teleport-agent
+
+- name: Démarrer et activer Teleport
+  systemd:
+    name: teleport
+    state: started
+    enabled: true

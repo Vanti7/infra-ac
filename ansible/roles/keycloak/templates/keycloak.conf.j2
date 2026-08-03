@@ -1,0 +1,9 @@
+db=postgres
+db-url=jdbc:postgresql://localhost/{{ keycloak_db_name }}
+db-username={{ keycloak_db_user }}
+db-password={{ keycloak_db_password }}
+hostname={{ sso_domain }}
+http-enabled=true
+http-host=127.0.0.1
+http-port=8080
+proxy-headers=xforwarded

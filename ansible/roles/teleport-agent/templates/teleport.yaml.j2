@@ -1,0 +1,13 @@
+version: v3
+teleport:
+  data_dir: /var/lib/teleport
+  join_params:
+    token_name: "{{ teleport_join_token }}"
+    method: token
+  proxy_server: {{ teleport_proxy_server }}
+auth_service:
+  enabled: false
+proxy_service:
+  enabled: false
+ssh_service:
+  enabled: true

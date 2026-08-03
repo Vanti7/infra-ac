@@ -1,0 +1,4 @@
+- name: redémarrer teleport-agent
+  systemd:
+    name: teleport
+    state: restarted

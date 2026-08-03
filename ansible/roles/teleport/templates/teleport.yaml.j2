@@ -1,0 +1,21 @@
+version: v3
+teleport:
+  data_dir: /var/lib/teleport
+auth_service:
+  enabled: true
+  cluster_name: {{ teleport_cluster_name }}
+  proxy_listener_mode: multiplex
+  authentication:
+    type: local
+    second_factor: webauthn
+    webauthn:
+      rp_id: {{ teleport_domain }}
+proxy_service:
+  enabled: true
+  web_listen_addr: 0.0.0.0:443
+  public_addr: {{ teleport_domain }}:443
+  acme:
+    enabled: true
+    email: {{ acme_email }}
+ssh_service:
+  enabled: true

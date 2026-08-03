@@ -1,0 +1,13 @@
+k3s_token: ""
+
+k3s_tls_san:
+  - kube.aetheriscloud.fr
+  - 10.42.0.11
+
+k3s_oidc_issuer_url: "https://sso.aetheriscloud.fr/realms/infra"
+k3s_oidc_client_id: kubernetes
+
+k3s_cluster_cidr: "10.44.0.0/16"
+k3s_service_cidr: "10.43.0.0/16"
+
+kubeconfig_local_path: "../secrets/kubeconfig/admin.yaml"

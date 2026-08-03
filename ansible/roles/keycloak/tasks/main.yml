@@ -1,0 +1,233 @@
+- name: Installer les paquets requis
+  apt:
+    name:
+      - postgresql
+      - python3-psycopg2
+      - openjdk-21-jdk-headless
+      - nginx
+    state: present
+    update_cache: true
+
+- name: Démarrer et activer postgresql
+  systemd:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Créer le rôle Postgres keycloak
+  community.postgresql.postgresql_user:
+    name: "{{ keycloak_db_user }}"
+    password: "{{ keycloak_db_password }}"
+  become: true
+  become_user: postgres
+
+- name: Créer la base keycloak
+  community.postgresql.postgresql_db:
+    name: "{{ keycloak_db_name }}"
+    owner: "{{ keycloak_db_user }}"
+  become: true
+  become_user: postgres
+
+- name: Créer l'utilisateur système keycloak
+  user:
+    name: keycloak
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Vérifier si Keycloak est déjà installé
+  stat:
+    path: "{{ keycloak_release_dir }}"
+  register: kc_installed
+
+- name: Télécharger et extraire Keycloak
+  unarchive:
+    src: "https://github.com/keycloak/keycloak/releases/download/{{ keycloak_version }}/keycloak-{{ keycloak_version }}.tar.gz"
+    dest: /opt
+    remote_src: true
+  when: not kc_installed.stat.exists
+
+- name: Symlink /opt/keycloak vers la version courante
+  file:
+    src: "{{ keycloak_release_dir }}"
+    dest: "{{ keycloak_home }}"
+    state: link
+
+- name: Déployer keycloak.conf
+  template:
+    src: keycloak.conf.j2
+    dest: "{{ keycloak_home }}/conf/keycloak.conf"
+    owner: keycloak
+    group: keycloak
+    mode: "0640"
+  notify: redémarrer keycloak
+
+- name: Donner la propriété de l'arborescence Keycloak à l'utilisateur keycloak
+  file:
+    path: "{{ keycloak_release_dir }}"
+    owner: keycloak
+    group: keycloak
+    recurse: true
+
+- name: Marqueur de build Keycloak
+  stat:
+    path: "{{ keycloak_home }}/.build_done"
+  register: kc_build_done
+
+- name: kc.sh build (bake le provider postgres)
+  command: "{{ keycloak_home }}/bin/kc.sh build --db=postgres"
+  become: true
+  become_user: keycloak
+  when: not kc_build_done.stat.exists
+
+- name: Marquer le build comme fait
+  file:
+    path: "{{ keycloak_home }}/.build_done"
+    state: touch
+    owner: keycloak
+    group: keycloak
+  when: not kc_build_done.stat.exists
+
+- name: Marqueur d'admin bootstrap
+  stat:
+    path: "{{ keycloak_home }}/.admin_bootstrapped"
+  register: kc_admin_done
+
+- name: Bootstrap de l'admin Keycloak (realm master)
+  command: >
+    {{ keycloak_home }}/bin/kc.sh bootstrap-admin user
+    --username {{ keycloak_admin_user }}
+    --password:env=KC_BOOTSTRAP_ADMIN_PASSWORD
+  become: true
+  become_user: keycloak
+  environment:
+    KC_BOOTSTRAP_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
+  when: not kc_admin_done.stat.exists
+
+- name: Marquer l'admin comme bootstrappé
+  file:
+    path: "{{ keycloak_home }}/.admin_bootstrapped"
+    state: touch
+    owner: keycloak
+    group: keycloak
+  when: not kc_admin_done.stat.exists
+
+- name: Déployer l'unité systemd Keycloak
+  template:
+    src: keycloak.service.j2
+    dest: /etc/systemd/system/keycloak.service
+    mode: "0644"
+  notify:
+    - recharger systemd
+    - redémarrer keycloak
+
+- name: Démarrer et activer Keycloak
+  systemd:
+    name: keycloak
+    state: started
+    enabled: true
+    daemon_reload: true
+
+- name: Vérifier si lego est déjà installé
+  stat:
+    path: /usr/local/bin/lego
+  register: lego_installed
+
+- name: Télécharger et installer lego
+  unarchive:
+    src: "https://github.com/go-acme/lego/releases/download/v{{ lego_version }}/lego_v{{ lego_version }}_linux_amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: /tmp/lego
+  when: not lego_installed.stat.exists
+
+- name: Installer le binaire lego
+  copy:
+    src: /tmp/lego
+    dest: /usr/local/bin/lego
+    mode: "0755"
+    remote_src: true
+  when: not lego_installed.stat.exists
+
+- name: Créer le répertoire lego
+  file:
+    path: "{{ lego_home }}"
+    state: directory
+    mode: "0700"
+
+- name: Vérifier si le certificat existe déjà
+  stat:
+    path: "{{ lego_home }}/certificates/{{ sso_domain }}.crt"
+  register: cert_exists
+
+- name: Obtenir le certificat via lego (DNS-01 Gandi)
+  command: >
+    lego run
+    --accept-tos
+    --path {{ lego_home }}
+    --email {{ acme_email }}
+    --dns gandiv5
+    --dns.resolvers 8.8.8.8:53,1.1.1.1:53
+    --domains {{ sso_domain }}
+  environment:
+    GANDIV5_PERSONAL_ACCESS_TOKEN: "{{ gandi_api_token }}"
+  when: not cert_exists.stat.exists
+
+- name: Déployer le script de renouvellement lego
+  template:
+    src: lego-renew.sh.j2
+    dest: /usr/local/bin/lego-renew.sh
+    mode: "0700"
+
+- name: Déployer le service systemd de renouvellement
+  copy:
+    dest: /etc/systemd/system/lego-renew.service
+    content: |
+      [Unit]
+      Description=Renouvellement certificat lego
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/lego-renew.sh
+  notify: recharger systemd
+
+- name: Déployer le timer systemd de renouvellement
+  copy:
+    dest: /etc/systemd/system/lego-renew.timer
+    content: |
+      [Unit]
+      Description=Renouvellement quotidien du certificat lego
+
+      [Timer]
+      OnCalendar=daily
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  notify:
+    - recharger systemd
+    - activer le timer lego
+
+- name: Déployer la config nginx pour Keycloak
+  template:
+    src: nginx-keycloak.conf.j2
+    dest: /etc/nginx/sites-available/keycloak.conf
+  notify: recharger nginx
+
+- name: Activer le site nginx keycloak
+  file:
+    src: /etc/nginx/sites-available/keycloak.conf
+    dest: /etc/nginx/sites-enabled/keycloak.conf
+    state: link
+
+- name: Désactiver le site nginx par défaut
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: recharger nginx
+
+- name: Démarrer et activer nginx
+  systemd:
+    name: nginx
+    state: started
+    enabled: true

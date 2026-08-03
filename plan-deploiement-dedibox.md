@@ -28,7 +28,7 @@
 | Hôte PVE | — | IP publique + `vmbr1` 10.42.0.1/24 + `wg0` 10.99.0.1/24 | ~2 Go + ARC 3 Go |
 | teleport | LXC | 10.42.0.5 | 2 / 2 Go / 10 Go |
 | iam (Keycloak+PG) | LXC | 10.42.0.6 | 2 / 3 Go / 20 Go |
-| k3s-server | VM | 10.42.0.11 | 2 / 3 Go / 30 Go |
+| k3s-adm | VM | 10.42.0.11 | 2 / 3 Go / 30 Go |
 | k3s-w1 | VM | 10.42.0.21 | 4 / 8 Go / 60 Go |
 | k3s-w2 | VM | 10.42.0.22 | 4 / 8 Go / 60 Go |
 
@@ -41,7 +41,7 @@ infra-dedibox/
 ├── terraform/            # provider bpg/proxmox : template cloud-init, VMs, LXC
 ├── ansible/
 │   ├── inventory.yml
-│   └── roles/            # base, haproxy, wireguard, keycloak, teleport, k3s-server, k3s-agent
+│   └── roles/            # base, haproxy, wireguard, keycloak, teleport, k3s-adm, k3s-agent
 ├── kubernetes/
 │   ├── bootstrap/        # install ArgoCD + app-of-apps
 │   ├── platform/         # traefik, cert-manager, monitoring, teleport-kube-agent, netbox
@@ -295,7 +295,7 @@ Optionnel mais confortable : `app_service` pour publier l'UI PVE et ArgoCD derri
 
 # Phase 5 — Cluster k3s (½ journée)
 
-Rôles Ansible `k3s-server` / `k3s-agent`, **version pinnée** (`INSTALL_K3S_VERSION`, dernière stable testée).
+Rôles Ansible `k3s-adm` / `k3s-agent`, **version pinnée** (`INSTALL_K3S_VERSION`, dernière stable testée).
 
 Server — `/etc/rancher/k3s/config.yaml` :
 
@@ -322,7 +322,7 @@ token: <node-token du server>
 
 Kubeconfig admin : récupérer `/etc/rancher/k3s/k3s.yaml` via WG, `server: https://10.42.0.11:6443` (l'admin passe par le WG, jamais par l'entrée publique).
 
-**Validation** : `kubectl get nodes` → 3 Ready ; `kubectl describe node k3s-server | grep Taint` → taint présent ; `kubectl get --raw /readyz` → ok.
+**Validation** : `kubectl get nodes` → 3 Ready ; `kubectl describe node k3s-adm | grep Taint` → taint présent ; `kubectl get --raw /readyz` → ok.
 
 ---
 

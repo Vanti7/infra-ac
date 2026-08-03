@@ -1,0 +1,36 @@
+- name: Vérifier si k3s-agent est déjà installé
+  stat:
+    path: /usr/local/bin/k3s-agent
+  register: k3s_agent_installed
+
+- name: Créer le dossier de config k3s
+  file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: "0755"
+
+- name: Déployer /etc/rancher/k3s/config.yaml
+  template:
+    src: config.yaml.j2
+    dest: /etc/rancher/k3s/config.yaml
+    mode: "0600"
+  notify: redémarrer k3s-agent
+
+- name: Télécharger le script d'installation k3s
+  get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s-install.sh
+    mode: "0755"
+  when: not k3s_agent_installed.stat.exists
+
+- name: Installer k3s (agent)
+  command: /tmp/k3s-install.sh agent
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version }}"
+  when: not k3s_agent_installed.stat.exists
+
+- name: Démarrer et activer k3s-agent
+  systemd:
+    name: k3s-agent
+    state: started
+    enabled: true

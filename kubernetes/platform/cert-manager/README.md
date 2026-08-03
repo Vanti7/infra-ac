@@ -35,6 +35,18 @@ podman build --target=image --build-arg GO_VERSION=1.23 \
   -t cert-manager-webhook-gandi:0.2.0-aetheris .
 ```
 
+## Bug corrigé : schéma d'authentification Gandi
+
+Le code d'origine (2021) envoie `Authorization: Apikey <token>` — c'était le
+schéma des anciennes API Keys Gandi. Les Personal Access Tokens actuels
+(ceux que le plan demande de générer, Phase 0) exigent `Authorization: Bearer
+<token>` ; avec `Apikey`, Gandi répond **403 Forbidden sur tout**, y compris
+un token parfaitement valide (diagnostiqué en comparant un test `curl` en
+`Apikey` vs `Bearer` sur le même enregistrement que `lego` gère déjà avec
+succès pour Keycloak). Patch dans `gandiclient.go` (`doRequest`) :
+`Apikey %s` → `Bearer %s`. Retaggé `0.2.1-aetheris` pour forcer le re-pull
+(les nœuds avaient déjà mis en cache `0.2.0-aetheris`).
+
 ## Registre
 
 Poussée vers le registre Gitea interne (Phase 6, `kubernetes/platform/gitea/`) :

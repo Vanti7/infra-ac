@@ -57,6 +57,24 @@ spec:
               memory: 256Mi
           service:
             type: ClusterIP
+          envValueFrom:
+            GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+              secretKeyRef:
+                name: grafana-oidc-secret
+                key: CLIENT_SECRET
+          grafana.ini:
+            server:
+              root_url: https://grafana.teleport.aetheriscloud.fr
+            auth.generic_oauth:
+              enabled: true
+              name: Keycloak
+              client_id: grafana
+              client_secret: $__env{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}
+              scopes: "openid profile email"
+              auth_url: https://sso.aetheriscloud.fr/realms/infra/protocol/openid-connect/auth
+              token_url: https://sso.aetheriscloud.fr/realms/infra/protocol/openid-connect/token
+              api_url: https://sso.aetheriscloud.fr/realms/infra/protocol/openid-connect/userinfo
+              role_attribute_path: "contains(groups[*], 'infra-admins') && 'Admin' || 'Viewer'"
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring

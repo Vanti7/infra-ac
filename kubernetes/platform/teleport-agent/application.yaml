@@ -12,13 +12,29 @@ spec:
     helm:
       values: |
         kubeClusterName: dedibox
-        roles: kube
+        roles: kube,app
         proxyAddr: teleport.aetheriscloud.fr:443
-        # Jeton généré via `tctl tokens add --type=kube`, TTL 1h : injecté hors Git
+        # Jeton généré via `tctl tokens add --type=kube,app`, TTL 1h : injecté hors Git
         # dans le Secret teleport-kube-agent-join-token (namespace teleport-agent).
         joinTokenSecret:
           create: false
           name: teleport-kube-agent-join-token
+        apps:
+          - name: vault
+            uri: http://vault.vault.svc.cluster.local:8200
+            public_addr: vault.teleport.aetheriscloud.fr
+          - name: argocd
+            uri: http://argocd-server.argocd.svc.cluster.local:80
+            public_addr: argocd.teleport.aetheriscloud.fr
+          - name: harbor
+            uri: http://harbor.harbor.svc.cluster.local:80
+            public_addr: harbor.teleport.aetheriscloud.fr
+          - name: grafana
+            uri: http://monitoring-grafana.monitoring.svc.cluster.local:80
+            public_addr: grafana.teleport.aetheriscloud.fr
+          - name: gitea
+            uri: http://gitea-http.gitea.svc.cluster.local:3000
+            public_addr: gitea.teleport.aetheriscloud.fr
         updater:
           enabled: true
   destination:

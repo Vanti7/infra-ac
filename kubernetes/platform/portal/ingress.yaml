@@ -1,0 +1,35 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: aetheriscloud-fr
+  namespace: portal
+spec:
+  secretName: aetheriscloud-fr-tls
+  issuerRef:
+    name: gandi-dns01
+    kind: ClusterIssuer
+  dnsNames:
+    - "aetheriscloud.fr"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: portal
+  namespace: portal
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - aetheriscloud.fr
+      secretName: aetheriscloud-fr-tls
+  rules:
+    - host: aetheriscloud.fr
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: portal
+                port:
+                  number: 80

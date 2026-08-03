@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: portal
+  namespace: portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: portal
+  template:
+    metadata:
+      labels:
+        app: portal
+    spec:
+      containers:
+        - name: portal
+          image: 10.42.0.11:30002/aetheriscloud/portal:1.0.0
+          ports:
+            - containerPort: 8080
+          env:
+            - name: OIDC_ISSUER
+              value: "https://sso.aetheriscloud.fr/realms/infra"
+            - name: OIDC_CLIENT_ID
+              value: "portal"
+            - name: PUBLIC_URL
+              value: "https://aetheriscloud.fr"
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: portal-secrets
+                  key: OIDC_CLIENT_SECRET
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: portal-secrets
+                  key: SESSION_SECRET
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portal
+  namespace: portal
+spec:
+  selector:
+    app: portal
+  ports:
+    - port: 80
+      targetPort: 8080

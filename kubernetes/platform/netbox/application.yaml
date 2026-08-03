@@ -19,7 +19,7 @@ spec:
         # bloquerait tout le monde. Accès direct par NodePort à la place.
         service:
           type: NodePort
-          nodePort: 30004
+          nodePort: "30004"
 
         superuser:
           existingSecret: netbox-superuser

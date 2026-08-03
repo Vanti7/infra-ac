@@ -20,9 +20,14 @@ spec:
         persistence:
           size: 10Gi
 
+        # NodePort (pas ClusterIP) : les nœuds k3s doivent pouvoir "docker pull"
+        # depuis ce registre lors du scheduling d'un pod, et la résolution DNS
+        # interne au cluster (service ClusterIP/headless) n'est PAS utilisable
+        # pour un pull d'image — containerd résout côté hôte, pas côté pod.
         service:
           http:
-            type: ClusterIP
+            type: NodePort
+            nodePort: 30300
 
         postgresql-ha:
           enabled: false

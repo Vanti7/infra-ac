@@ -1,6 +1,8 @@
 k3s_version: "v1.36.2+k3s1"
 k3s_server_url: "https://10.42.0.11:6443"
 
-# Registre Gitea (packages/container) : pas de TLS en interne (accès WG/cluster
-# uniquement), donc containerd doit être configuré pour l'accepter en plain HTTP.
+# Registres internes : pas de TLS (accès WG/cluster uniquement), donc containerd
+# doit être configuré pour les accepter en plain HTTP. Gitea reste pour le Git ;
+# Harbor est le registre de conteneurs (remplace l'usage initial du registre Gitea).
 k3s_registry_host: "10.42.0.11:30300"
+k3s_harbor_registry_host: "10.42.0.11:30002"

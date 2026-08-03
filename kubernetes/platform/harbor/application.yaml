@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: harbor
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.goharbor.io
+    chart: harbor
+    targetRevision: 1.19.2
+    helm:
+      values: |
+        # Remplace Gitea comme registre de conteneurs (Gitea garde son rôle
+        # Git). Pas de TLS/ingress en interne : accès WG/port-forward
+        # uniquement, même modèle que Vault/ArgoCD/Gitea. NodePort (pas
+        # ClusterIP) pour que containerd sur les nœuds k3s puisse puller
+        # (résolution DNS de service cluster-interne inutilisable pour un
+        # pull d'image, cf. déviation Gitea).
+        expose:
+          type: nodePort
+          tls:
+            enabled: false
+          nodePort:
+            ports:
+              http:
+                nodePort: 30002
+
+        externalURL: http://10.42.0.11:30002
+
+        existingSecretAdminPassword: harbor-admin-secret
+        existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: harbor
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

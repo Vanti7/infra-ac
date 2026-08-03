@@ -1,16 +1,16 @@
+{{/*
+Une seule NetworkPolicy plutôt que plusieurs séparées (default-deny +
+allow-*) : validé en conditions réelles que kube-router (moteur de netpol
+de k3s) n'unit pas correctement plusieurs objets NetworkPolicy ciblant les
+mêmes pods — seule une politique combinée en un seul objet applique
+effectivement l'ensemble des règles d'allow attendues, le reste restant
+refusé par défaut (implicite dès qu'au moins une NetworkPolicy sélectionne
+le pod).
+*/}}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: default-deny
-  namespace: cust-{{ .Values.name }}
-spec:
-  podSelector: {}
-  policyTypes: [Ingress, Egress]
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-intra-namespace
+  name: client-netpol
   namespace: cust-{{ .Values.name }}
 spec:
   podSelector: {}
@@ -18,19 +18,13 @@ spec:
   ingress:
     - from:
         - podSelector: {}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.traefikNamespace }}
   egress:
     - to:
         - podSelector: {}
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns-egress
-  namespace: cust-{{ .Values.name }}
-spec:
-  podSelector: {}
-  policyTypes: [Egress]
-  egress:
     - to:
         - namespaceSelector:
             matchLabels:
@@ -40,17 +34,3 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-ingress-from-traefik
-  namespace: cust-{{ .Values.name }}
-spec:
-  podSelector: {}
-  policyTypes: [Ingress]
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: {{ .Values.traefikNamespace }}

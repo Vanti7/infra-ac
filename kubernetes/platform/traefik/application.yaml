@@ -11,8 +11,15 @@ spec:
     targetRevision: 41.1.1
     helm:
       values: |
+        # hostPort 443 sur seulement 2 workers : un rolling update en surge
+        # (défaut du chart) ne trouve nulle part où scheduler le 3e pod.
+        # maxUnavailable=1/maxSurge=0 remplace un pod à la fois à la place.
         deployment:
           replicas: 2
+        updateStrategy:
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
         ports:
           web:
             proxyProtocol:

@@ -1,0 +1,22 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-apps
+  namespace: traefik
+spec:
+  secretName: wildcard-apps-tls
+  issuerRef:
+    name: gandi-dns01
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.apps.aetheriscloud.fr"
+    - "apps.aetheriscloud.fr"
+---
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: traefik
+spec:
+  defaultCertificate:
+    secretName: wildcard-apps-tls

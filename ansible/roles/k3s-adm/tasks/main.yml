@@ -16,6 +16,13 @@
     mode: "0600"
   notify: redémarrer k3s
 
+- name: Déployer /etc/rancher/k3s/registries.yaml (registre Gitea en plain HTTP)
+  template:
+    src: registries.yaml.j2
+    dest: /etc/rancher/k3s/registries.yaml
+    mode: "0644"
+  notify: redémarrer k3s
+
 - name: Télécharger le script d'installation k3s
   get_url:
     url: https://get.k3s.io

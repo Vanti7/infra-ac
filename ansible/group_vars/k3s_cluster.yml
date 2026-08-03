@@ -1,2 +1,6 @@
 k3s_version: "v1.36.2+k3s1"
 k3s_server_url: "https://10.42.0.11:6443"
+
+# Registre Gitea (packages/container) : pas de TLS en interne (accès WG/cluster
+# uniquement), donc containerd doit être configuré pour l'accepter en plain HTTP.
+k3s_registry_host: "10.42.0.11:30300"

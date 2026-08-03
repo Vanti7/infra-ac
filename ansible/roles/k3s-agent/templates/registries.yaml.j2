@@ -1,0 +1,8 @@
+mirrors:
+  "{{ k3s_registry_host }}":
+    endpoint:
+      - "http://{{ k3s_registry_host }}"
+configs:
+  "{{ k3s_registry_host }}":
+    tls:
+      insecure_skip_verify: true

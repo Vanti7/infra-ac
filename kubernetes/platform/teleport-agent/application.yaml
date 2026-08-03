@@ -26,9 +26,11 @@ spec:
           - name: argocd
             uri: http://argocd-server.argocd.svc.cluster.local:80
             public_addr: argocd.teleport.aetheriscloud.fr
-          - name: harbor
-            uri: http://harbor.harbor.svc.cluster.local:80
-            public_addr: harbor.teleport.aetheriscloud.fr
+          # Harbor volontairement absent : son externalURL sert aussi à générer
+          # l'URL d'authentification que containerd utilise pour puller les
+          # images (Www-Authenticate: realm=...). La faire pointer vers Teleport
+          # casserait les pulls (containerd n'a pas de session Teleport). Harbor
+          # reste en accès direct WG/NodePort (http://10.42.0.11:30002).
           - name: grafana
             uri: http://monitoring-grafana.monitoring.svc.cluster.local:80
             public_addr: grafana.teleport.aetheriscloud.fr

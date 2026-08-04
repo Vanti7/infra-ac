@@ -255,10 +255,15 @@ Tâches récurrentes à planifier (pas un one-shot) :
   6. Plusieurs resyncs ArgoCD rapprochés pendant que les migrations Django (très nombreuses, ~5 min la première fois) étaient encore en cours ont provoqué des rollouts qui se chevauchent (deux pods NetBox actifs simultanément, migrations concurrentes sur la même base fraîche) — résolu en laissant un cycle se terminer sans intervenir, puis nettoyage manuel du ReplicaSet obsolète resté bloqué
 
 ### 10.3 Modélisation
-- [ ] Créer les prefixes (10.42.0.0/24, 10.99.0.0/24, IP publique)
-- [ ] Créer l'hôte + les 5 VM/CT avec IP primaires, cluster « dedibox »
-- [ ] Créer les tenants NetBox (`interne` + un par client), custom field `namespace`, tag `managed-by:ansible`
-- [ ] Créer les services (sso/443, teleport/443, kube/6443, apps/443)
+- [x] Prefixes créés : `10.42.0.0/24` (interne vmbr1), `10.99.0.0/24` (WireGuard), `10.44.0.0/16` (cluster-cidr k3s), `10.43.0.0/16` (service-cidr k3s), + IP publique `51.15.191.67/32` en enregistrement isolé
+- [x] Cluster « dedibox » (type « Proxmox VE ») + les 5 VM/CT (`k3s-adm`, `k3s-w1`, `k3s-w2`, `teleport`, `iam`) modélisées comme Virtual Machines (pas de Device DCIM complet — manufacturer/device-type/site auraient été disproportionnés pour le besoin réel, qui est du suivi IP léger, pas de l'inventaire d'actifs), avec interface `eth0` + IP primaire assignée pour chacune
+- [x] Services créés (`sso-https`/443 sur `iam`, `teleport-proxy`/443 sur `teleport`, `k3s-api`/6443 sur `k3s-adm`, `traefik-https`/443 sur `k3s-w1`/`k3s-w2`)
+- [ ] Tenants NetBox (`interne` + un par client) — différé, pas de vrai client pour l'instant (cf. Phase 7)
+- [x] ⚠ **Peuplement scripté via l'API REST** (pas manuellement via l'UI) — bugs rencontrés :
+  - Le token API généré via `Token.objects.create(user=u)` (ORM direct) produit un token **v2** dont le secret en clair (`plaintext`) n'est jamais stocké en base (par design, comme un PAT GitHub) — donc invisible/inutilisable après coup. Fix : construire explicitement un token **v1** (`Token(user=u, version=1, token='<valeur>')`), qui stocke le plaintext en clair et est directement comparable
+  - Le modèle `Token.key` fait 12 caractères max dans cette version (pas 40) — une valeur trop longue plantait `Token.objects.create()` avec une erreur SQL peu explicite (`value too long for type character varying(12)`)
+  - Champ `ipam.services` : `virtual_machine` n'existe plus dans le schéma de cette version — remplacé par `parent_object_type`/`parent_object_id` (polymorphique, `virtualization.virtualmachine`)
+  - `cluster-types` exige un `slug` explicite (pas auto-généré depuis `name` côté API, contrairement à l'UI)
 
 ### 10.4 Automatisation
 - [ ] Basculer l'inventaire Ansible en dynamique (plugin `netbox.netbox.nb_inventory`), supprimer l'inventaire statique

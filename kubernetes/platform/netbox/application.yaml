@@ -24,14 +24,20 @@ spec:
         superuser:
           existingSecret: netbox-superuser
 
-        # `auth.existingSecretName` ne fonctionne pas avec cette version du
-        # sous-chart (clés attendues différentes : password/postgres-password,
-        # pas postgresql-password) — le chart régénère son propre secret quoi
-        # qu'il arrive, et ArgoCD écrasait notre secret manuel à chaque sync.
-        # On laisse le chart gérer le sien (mot de passe copié dans
-        # secrets/netbox_db_password.txt pour référence, cf. workflow).
+        # Le champ s'appelle `existingSecret` (singulier), pas
+        # `existingSecretName` — celui-ci n'existe pas dans le schéma de ce
+        # sous-chart et était silencieusement ignoré. Sans lui, le chart
+        # régénère un mot de passe aléatoire à CHAQUE sync (le mécanisme
+        # "réutilise le mot de passe existant" du chart repose sur la
+        # fonction Helm `lookup`, qui ne fonctionne que sous `helm
+        # install`/`upgrade` — jamais sous `helm template`, ce qu'utilise
+        # ArgoCD). Sans existingSecret, postgres s'initialise avec UN mot de
+        # passe, ArgoCD en régénère un AUTRE au sync suivant : mismatch
+        # permanent. Clé "password" = défaut du chart (auth.secretKeys.userPasswordKey).
         postgresql:
           enabled: true
+          auth:
+            existingSecret: netbox-postgresql-fixed
 
         remoteAuth:
           enabled: true

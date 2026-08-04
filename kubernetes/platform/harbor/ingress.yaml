@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: harbor-aetheriscloud-fr
+  namespace: harbor
+spec:
+  secretName: harbor-aetheriscloud-fr-tls
+  issuerRef:
+    name: gandi-dns01
+    kind: ClusterIssuer
+  dnsNames:
+    - "harbor.aetheriscloud.fr"

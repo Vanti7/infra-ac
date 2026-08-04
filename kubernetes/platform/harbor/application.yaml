@@ -11,26 +11,26 @@ spec:
     targetRevision: 1.19.2
     helm:
       values: |
-        # Remplace Gitea comme registre de conteneurs (Gitea garde son rôle
-        # Git). Pas de TLS/ingress en interne : accès WG/port-forward
-        # uniquement, même modèle que Vault/ArgoCD/Gitea. NodePort (pas
-        # ClusterIP) pour que containerd sur les nœuds k3s puisse puller
-        # (résolution DNS de service cluster-interne inutilisable pour un
-        # pull d'image, cf. déviation Gitea).
+        # Revu : accès via Traefik (vrai cert, pas de port dans l'URL), plus
+        # de NodePort/IP privée. Traefik est un simple reverse-proxy sans
+        # porte d'auth (contrairement à Teleport, cf. workflow) : ça ne
+        # casse pas l'auth du registre pour containerd, qui pull maintenant
+        # via le même hostname public que les humains — plus besoin du
+        # contournement plain-HTTP/insecure_skip_verify de registries.yaml.
         expose:
-          type: nodePort
+          type: ingress
           tls:
-            enabled: false
-          nodePort:
-            ports:
-              http:
-                nodePort: 30002
+            enabled: true
+            certSource: secret
+            secret:
+              secretName: harbor-aetheriscloud-fr-tls
+          ingress:
+            hosts:
+              core: harbor.aetheriscloud.fr
+            className: traefik
+            annotations: {}
 
-        # harbor.aetheriscloud.fr résout en public vers l'IP privée 10.42.0.11
-        # (voir workflow) : nom plus lisible que l'IP:port, mais reste
-        # strictement injoignable hors WG/LAN (personne ne route vers une IP
-        # privée sans y être), donc pas d'exposition supplémentaire.
-        externalURL: http://harbor.aetheriscloud.fr:30002
+        externalURL: https://harbor.aetheriscloud.fr
 
         existingSecretAdminPassword: harbor-admin-secret
         existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD

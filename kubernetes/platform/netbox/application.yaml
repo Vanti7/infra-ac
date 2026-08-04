@@ -11,15 +11,28 @@ spec:
     targetRevision: 8.3.47
     helm:
       values: |
-        # netbox.aetheriscloud.fr résout en public vers l'IP privée 10.42.0.11
-        # (même pattern que Harbor, cf. workflow) : le plan prévoyait Traefik +
-        # ipAllowList (10.99.0.0/24, 10.42.0.0/24), mais avec notre WireGuard en
-        # split-tunnel le trafic vers un hostname public ne passe jamais par le
-        # tunnel — Traefik verrait notre IP publique réelle, pas notre IP WG, et
-        # bloquerait tout le monde. Accès direct par NodePort à la place.
+        # Revu : accès via Traefik (pas de port dans l'URL), pas ipAllowList.
+        # L'ipAllowList aurait bloqué tout le monde (WireGuard en split-tunnel,
+        # cf. déviation encore visible dans le workflow) — l'accès direct par
+        # NodePort marchait mais imposait de taper l'IP *et* le port, jugé
+        # inacceptable. Traefik est un simple reverse-proxy sans porte d'auth
+        # (contrairement à Teleport) : le vrai contrôle d'accès reste le SSO
+        # Keycloak, pas l'IP source — cohérent avec sso.aetheriscloud.fr qui
+        # fonctionne déjà exactement comme ça.
         service:
-          type: NodePort
-          nodePort: "30004"
+          type: ClusterIP
+
+        ingress:
+          enabled: true
+          className: traefik
+          hosts:
+            - host: netbox.aetheriscloud.fr
+              paths:
+                - /
+          tls:
+            - secretName: netbox-aetheriscloud-fr-tls
+              hosts:
+                - netbox.aetheriscloud.fr
 
         superuser:
           existingSecret: netbox-superuser

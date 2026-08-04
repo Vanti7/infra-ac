@@ -1,8 +1,9 @@
 k3s_version: "v1.36.2+k3s1"
 k3s_server_url: "https://10.42.0.11:6443"
 
-# Registres internes : pas de TLS (accès WG/cluster uniquement), donc containerd
-# doit être configuré pour les accepter en plain HTTP. Gitea reste pour le Git ;
-# Harbor est le registre de conteneurs (remplace l'usage initial du registre Gitea).
+# Registre Gitea (packages, pas le rôle registre principal) : pas de TLS
+# (accès WG/cluster uniquement), containerd doit l'accepter en plain HTTP.
+# Harbor (le vrai registre de conteneurs) n'a plus besoin d'entrée ici depuis
+# qu'il est passé derrière Traefik avec un vrai certificat Let's Encrypt
+# (harbor.aetheriscloud.fr) — pull HTTPS standard, aucune config spéciale.
 k3s_registry_host: "10.42.0.11:30300"
-k3s_harbor_registry_host: "10.42.0.11:30002"

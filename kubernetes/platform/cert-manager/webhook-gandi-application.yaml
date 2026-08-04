@@ -16,7 +16,7 @@ spec:
         # la plus utilisée datant de 2021.
         groupName: acme.aetheriscloud.fr
         image:
-          repository: 10.42.0.11:30002/aetheriscloud/cert-manager-webhook-gandi
+          repository: harbor.aetheriscloud.fr/aetheriscloud/cert-manager-webhook-gandi
           tag: 0.2.1-aetheris
         certManager:
           namespace: cert-manager

@@ -54,6 +54,12 @@ spec:
             memory: 512Mi
           limits:
             memory: 1Gi
+
+        # 1 primaire + 3 répliques par défaut, très excessif pour un IPAM à
+        # usage unique sur ce cluster. Simple cache/queue, pas besoin de HA.
+        valkey:
+          replica:
+            replicaCount: 0
   destination:
     server: https://kubernetes.default.svc
     namespace: netbox

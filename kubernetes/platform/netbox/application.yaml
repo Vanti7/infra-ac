@@ -67,9 +67,14 @@ spec:
 
         # 1 primaire + 3 répliques par défaut, très excessif pour un IPAM à
         # usage unique sur ce cluster. Simple cache/queue, pas besoin de HA.
+        # existingSecret : même bug lookup/ArgoCD que postgresql ci-dessus,
+        # mais celui-ci a le bon nom de champ dans son schéma — juste jamais
+        # positionné initialement.
         valkey:
           replica:
             replicaCount: 0
+          auth:
+            existingSecret: netbox-valkey-fixed
   destination:
     server: https://kubernetes.default.svc
     namespace: netbox

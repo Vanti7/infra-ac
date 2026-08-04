@@ -237,13 +237,22 @@ Tâches récurrentes à planifier (pas un one-shot) :
 
 ## Phase 10 — CMDB NetBox
 
+> ⚠ **Avancée en dehors de l'ordre du plan**, à la demande explicite de l'utilisateur (besoin immédiat d'IPAM pour suivre les IP/ports au fur et à mesure des outils ajoutés en Phase 6/7 — Harbor, Gitea, etc.), plutôt qu'après les Phases 8/9.
+
 ### 10.1 Préalable : PROXY protocol
-- [ ] Activer `send-proxy-v2` sur `bk_ingress` (HAProxy)
-- [ ] Configurer `proxyProtocol.trustedIPs` côté Traefik
+- [x] `send-proxy-v2` sur `bk_ingress` + `proxyProtocol.trustedIPs` côté Traefik — déjà fait en Phase 6 (pas spécifique à NetBox, dette du plan traitée dès que l'ingress est devenu réel)
 
 ### 10.2 Déploiement
-- [ ] Déployer le chart NetBox (PG+Redis inclus), PV local-path, ressources cappées
-- [ ] Ingress `netbox.aetheriscloud.fr` sans DNS public + `ipAllowList` (10.99.0.0/24, 10.42.0.0/24) + SSO OIDC Keycloak
+- [x] Chart NetBox officiel (`netbox/netbox`, `charts.netbox.oss.netboxlabs.com` — pas de repo `netbox-community/helm-charts`, 404), PG+Valkey inclus, ressources cappées
+- [x] ⚠ **Déviation majeure : pas d'Ingress/ipAllowList, accès direct par NodePort** — le plan prévoyait Traefik + `ipAllowList` (10.99.0.0/24, 10.42.0.0/24), mais notre WireGuard est en **split-tunnel** (seuls 10.42.0.0/24 et 10.99.0.0/24 passent par le tunnel) : le trafic vers un hostname public ne transite jamais par le tunnel, donc Traefik verrait l'IP publique réelle du client, pas son IP WG — l'`ipAllowList` bloquerait tout le monde, y compris l'admin légitime. Pattern Harbor repris à la place : `netbox.aetheriscloud.fr` résout en public vers l'IP privée `10.42.0.11`, NodePort `30004`, strictement injoignable hors WG/LAN
+- [x] SSO OIDC Keycloak dès le déploiement (pas après coup) — OIDC générique (`social_core.backends.open_id_connect.OpenIdConnectAuth`), groupe `infra-admins`
+- [x] ⚠ **Chaîne de bugs rencontrés et corrigés**, dans l'ordre :
+  1. Le mécanisme `extraConfig` documenté par le chart (fichiers YAML montés pour config additionnelle) **ne fonctionne pas avec cette image** : le loader de config natif de NetBox (`netbox/configuration.py`) ne scanne que `/etc/netbox/config/*.py` — les YAML montés par `extraConfig` (sous `/run/config/extra/`) ne sont jamais lus, sans la moindre erreur. Contourné avec `extraVolumes`/`extraVolumeMounts` génériques, fichier de settings SSO monté directement en Python valide (`990-sso.py`)
+  2. `postgresql.auth.existingSecretName` **n'existe pas dans le schéma** de ce sous-chart (le bon champ est `existingSecret`, singulier) — silencieusement ignoré, donc jamais pris en compte
+  3. Conséquence du point 2 : sans `existingSecret` réellement actif, le mécanisme "réutilise le mot de passe existant" du chart repose sur la fonction Helm `lookup` — qui **ne fonctionne que sous `helm install`/`upgrade`, jamais sous `helm template`**, or c'est exactement ce qu'utilise ArgoCD pour rendre les manifests. Résultat : un nouveau mot de passe Postgres aléatoire régénéré à **chaque sync ArgoCD**, alors que Postgres restait sur celui de son tout premier démarrage → `password authentication failed` en boucle, nécessitant plusieurs resets complets du PVC pour diagnostiquer proprement (bug non-évident : le symptôme ressemblait à une simple erreur de frappe au premier abord)
+  4. `service.nodePort` doit être une **chaîne**, pas un nombre, dans le schéma de valeurs de ce chart (erreur de validation Helm sinon)
+  5. Valkey déployé par défaut avec 1 primaire + 3 répliques (4 pods) pour un simple cache/queue d'IPAM mono-utilisateur — réduit à 1 seul pod
+  6. Plusieurs resyncs ArgoCD rapprochés pendant que les migrations Django (très nombreuses, ~5 min la première fois) étaient encore en cours ont provoqué des rollouts qui se chevauchent (deux pods NetBox actifs simultanément, migrations concurrentes sur la même base fraîche) — résolu en laissant un cycle se terminer sans intervenir, puis nettoyage manuel du ReplicaSet obsolète resté bloqué
 
 ### 10.3 Modélisation
 - [ ] Créer les prefixes (10.42.0.0/24, 10.99.0.0/24, IP publique)

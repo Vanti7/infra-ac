@@ -37,6 +37,9 @@ spec:
           - name: gitea
             uri: http://gitea-http.gitea.svc.cluster.local:3000
             public_addr: gitea.teleport.aetheriscloud.fr
+          - name: docs-internal
+            uri: http://docs-internal.docs-internal.svc.cluster.local:80
+            public_addr: docs-internal.teleport.aetheriscloud.fr
         updater:
           enabled: true
   destination:

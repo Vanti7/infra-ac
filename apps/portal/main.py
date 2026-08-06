@@ -27,6 +27,7 @@ TOOLS = [
     {"name": "NetBox", "description": "IPAM / CMDB", "url": "https://netbox.aetheriscloud.fr", "group": "infra-admins"},
     {"name": "Grafana", "description": "Monitoring", "url": "https://grafana.teleport.aetheriscloud.fr", "group": "infra-admins"},
     {"name": "Gitea", "description": "Git", "url": "https://gitea.teleport.aetheriscloud.fr", "group": "infra-admins"},
+    {"name": "Docs", "description": "Documentation interne (ops)", "url": "https://docs-internal.teleport.aetheriscloud.fr", "group": "infra-admins"},
     {"name": "Teleport", "description": "Accès SSH / Kubernetes (tsh)", "url": "https://teleport.aetheriscloud.fr", "group": None},
 ]
 

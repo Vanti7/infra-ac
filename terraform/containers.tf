@@ -59,7 +59,7 @@ resource "proxmox_virtual_environment_container" "this" {
 
   operating_system {
     template_file_id = proxmox_download_file.debian_lxc_template.id
-    type              = "debian"
+    type             = "debian"
   }
 
   provisioner "remote-exec" {

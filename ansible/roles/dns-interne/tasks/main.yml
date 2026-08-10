@@ -1,0 +1,9 @@
+- name: "Résolution interne — bloc /etc/hosts généré depuis NetBox"
+  blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - dns-interne (source: NetBox)"
+    block: |
+      {% for h in groups['all'] | sort %}
+      {{ hostvars[h].ansible_host }} {{ h }}
+      {% endfor %}
+    mode: "0644"

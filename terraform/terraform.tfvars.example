@@ -1,5 +1,6 @@
 # Copier en terraform.tfvars (gitignored) et adapter.
 # proxmox_api_token ne va JAMAIS ici : export TF_VAR_proxmox_api_token="terraform@pve!iac=<uuid>"
+# netbox_api_token non plus : export TF_VAR_netbox_api_token="$(cat ../secrets/netbox_api_token.txt)"
 
 proxmox_node   = "pve"
 ssh_public_key = "ssh-ed25519 AAAA... admin@poste"

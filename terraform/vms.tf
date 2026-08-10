@@ -1,8 +1,8 @@
 locals {
   vms = {
-    k3s-adm    = { vm_id = 111, ip = "10.42.0.11/24", cores = 2, memory = 3072, disk_size = 30 }
-    k3s-w1     = { vm_id = 121, ip = "10.42.0.21/24", cores = 4, memory = 8192, disk_size = 60 }
-    k3s-w2     = { vm_id = 122, ip = "10.42.0.22/24", cores = 4, memory = 8192, disk_size = 60 }
+    k3s-adm = { vm_id = 111, ip = "10.42.0.11/24", cores = 2, memory = 3072, disk_size = 30 }
+    k3s-w1  = { vm_id = 121, ip = "10.42.0.21/24", cores = 4, memory = 8192, disk_size = 60 }
+    k3s-w2  = { vm_id = 122, ip = "10.42.0.22/24", cores = 4, memory = 8192, disk_size = 60 }
   }
 }
 

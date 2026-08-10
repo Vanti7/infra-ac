@@ -1,0 +1,26 @@
+name: sync-netbox
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "kubernetes/tenants/*.values.yaml"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install -r scripts/requirements.txt
+
+      - name: Synchroniser les tenants vers NetBox
+        env:
+          NETBOX_URL: https://netbox.aetheriscloud.fr
+          NETBOX_TOKEN: ${{ secrets.NETBOX_TOKEN }}
+        run: python3 scripts/sync_netbox_tenants.py

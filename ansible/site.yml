@@ -33,3 +33,9 @@
   become: true
   roles:
     - k3s-agent
+
+- name: Résolution DNS interne (source NetBox)
+  hosts: all
+  become: true
+  roles:
+    - dns-interne

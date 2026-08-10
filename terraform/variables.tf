@@ -50,3 +50,15 @@ variable "datastore_id" {
   type        = string
   default     = "local-zfs"
 }
+
+variable "netbox_server_url" {
+  description = "URL publique de NetBox (Phase 10)"
+  type        = string
+  default     = "https://netbox.aetheriscloud.fr"
+}
+
+variable "netbox_api_token" {
+  description = "Token API NetBox (compte terraform, permissions CMDB) — passer via TF_VAR_netbox_api_token, jamais en dur ici"
+  type        = string
+  sensitive   = true
+}

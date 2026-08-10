@@ -8,3 +8,8 @@ provider "proxmox" {
     username = "root"
   }
 }
+
+provider "netbox" {
+  server_url = var.netbox_server_url
+  api_token  = var.netbox_api_token
+}

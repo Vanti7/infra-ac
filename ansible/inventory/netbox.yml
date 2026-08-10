@@ -1,0 +1,42 @@
+# Inventaire secondaire, gardé pour référence — plus l'inventaire par défaut
+# (voir ansible.cfg / terraform/inventory.tf) depuis qu'on a réalisé que faire
+# dépendre Ansible de NetBox est circulaire : NetBox tourne dans k3s, k3s a
+# besoin d'Ansible pour exister. La source de vérité est maintenant Terraform
+# (qui ne dépend que de Proxmox), avec un `local_file` généré à chaque apply.
+# Cet inventaire reste utilisable à la main (`-i inventory/netbox.yml`) si
+# NetBox tourne déjà et qu'on veut vérifier qu'il reflète bien le parc réel.
+plugin: netbox.netbox.nb_inventory
+api_endpoint: https://netbox.aetheriscloud.fr
+token: "{{ lookup('env', 'NETBOX_TOKEN') }}"
+validate_certs: true
+
+# Slugs des roles NetBox (k3s_server, k3s_agents, teleport, iam) sont volontairement
+# identiques aux groupes ansible historiques pour que site.yml n'ait rien à changer.
+group_by:
+  - device_roles
+  - tenants
+  - tags
+  - sites
+group_names_raw: true
+
+# Ne remonte que les machines explicitement gérées par Ansible (tag posé côté NetBox) :
+# évite qu'un futur inventaire NetBox client (phase 7) se retrouve mélangé au parc infra.
+query_filters:
+  - tag: managed_by_ansible
+
+# NB: "compose" est évalué sur le dict brut renvoyé par l'API NetBox (host["role"]["slug"]),
+# pas sur les hostvars déjà calculées par le plugin (device_roles n'existe pas encore ici).
+compose:
+  ansible_host: primary_ip4.address | ansible.utils.ipaddr('address')
+  ansible_user: "'admin'"
+  # teleport/iam sont des LXC (le rôle base y désactive chrony au profit de l'horloge hôte) ;
+  # les rôles k3s_server/k3s_agents sont de vraies VM QEMU. Dérivé du role NetBox, pas
+  # d'un champ dédié : cette ligne à revoir si un futur rôle mélange LXC et VM.
+  is_container: "(role.slug | default('')) in ['teleport', 'iam']"
+
+# k3s_cluster n'existe pas côté NetBox (ce n'est pas un rôle) : recomposé ici pour le
+# "hosts: k3s_cluster:iam" de site.yml. "groups" (contrairement à "compose") voit aussi
+# les hostvars déjà calculées, mais on reste sur le champ brut role.slug pour homogénéité
+# avec is_container ci-dessus plutôt que de dépendre de ce détail d'implémentation.
+groups:
+  k3s_cluster: "(role.slug | default('')) in ['k3s_server', 'k3s_agents']"

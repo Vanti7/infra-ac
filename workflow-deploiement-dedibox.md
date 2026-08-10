@@ -268,11 +268,32 @@ Tâches récurrentes à planifier (pas un one-shot) :
 > 🔧 **Correction ultérieure (Harbor + NetBox)** : l'accès direct par NodePort ("IP privée + port", cf. déviation ci-dessus) réglait le contournement de l'`ipAllowList` mais gardait un port dans l'URL — jugé inacceptable par l'utilisateur ("c'est dégueulasse"), à raison. En reconsidérant : la réticence initiale à utiliser Traefik pour Harbor concernait spécifiquement le routage via **Teleport `app_service`** (qui exige une session authentifiée pour chaque requête, casserait l'auth du registre pour containerd) — **Traefik lui-même est un simple reverse-proxy sans porte d'auth**, ce problème ne s'applique pas à lui. Les deux sont repassés en public (`harbor.aetheriscloud.fr`, `netbox.aetheriscloud.fr`) avec un vrai Certificate cert-manager + Ingress Traefik, `expose.type: ingress`/`certSource: secret` côté Harbor, `externalURL` mis à jour en conséquence. Bénéfice induit : plus besoin du contournement plain-HTTP/`insecure_skip_verify` dans `registries.yaml` pour Harbor — pull HTTPS standard, vrai certificat. Le contrôle d'accès réel reste le SSO Keycloak (comme `sso.aetheriscloud.fr` l'a toujours fait), pas l'obscurité d'une IP privée. ⚠ Note technique : ArgoCD affiche ces deux Ingress en `Progressing` permanent (même après resync complet) — Traefik ne remplit pas `status.loadBalancer` sur l'objet Ingress comme le ferait un load-balancer cloud, et le health check d'ArgoCD s'y attend ; comportement purement cosmétique, tout fonctionne (vérifié en HTTPS externe, TLS valide, pulls d'image confirmés)
 
 ### 10.4 Automatisation
-- [ ] Basculer l'inventaire Ansible en dynamique (plugin `netbox.netbox.nb_inventory`), supprimer l'inventaire statique
-- [ ] Créer le job CI `sync-netbox` (GitHub Action, déclenché sur merge `tenants/`)
-- [ ] Rôle Ansible `dns-interne` générant unbound/hosts depuis NetBox
 
-**✅ Validation** : `ansible-inventory --list` reflète NetBox · retrait d'une machine → disparaît de l'inventaire · playbook `base` rejoué sans diff · fiche tenant complète en un écran
+> Démarrée avant la Phase 8 (backups) — arbitrage explicite de l'utilisateur : le NAS maison qui doit recevoir les sauvegardes n'est pas encore prêt, l'automatisation NetBox si.
+
+- [x] Inventaire Ansible **dynamique** (`ansible/inventory/netbox.yml`, plugin `netbox.netbox.nb_inventory`), inventaire statique (`inventory.yml`) supprimé, `ansible.cfg` pointe dessus par défaut
+  - Modélisation NetBox ajoutée pour que ça tienne : site `stargate_px1`, tenant `interne`, 4 rôles NetBox dont le **slug est volontairement identique aux groupes ansible historiques** (`k3s_server`, `k3s_agents`, `teleport`, `iam`) pour que `site.yml` n'ait rien à changer, tag `managed_by_ansible` posé sur les 5 VM (sert aussi de filtre : `query_filters: [{tag: managed_by_ansible}]`, pour qu'un futur inventaire client (Phase 7) ne se mélange pas au parc infra)
+  - `group_by: [device_roles, tenants, tags, sites]` + `group_names_raw: true` ; groupe composite `k3s_cluster` recréé à la main (`groups:`, une VM n'a pas de rôle « cluster » côté NetBox)
+  - ⚠ **Piège non documenté du plugin** : `compose` et `groups` ne voient pas les mêmes données. `compose` (`_set_composite_vars`) ne reçoit que le **dict brut de l'API NetBox** (`role.slug`, `primary_ip4.address`) ; `groups` (`_add_host_to_composed_groups`) reçoit en plus les hostvars **déjà calculées** par le plugin (`device_roles`, etc.) grâce à un `combine_vars` avec l'inventaire en cours de construction. Une première tentative de dériver `is_container` via `device_roles` dans `compose` échouait silencieusement (toujours `false`, pas d'erreur) — corrigé en repassant sur le champ brut `role.slug` dans les deux blocs, plus homogène
+  - `pynetbox`/`pytz` absents du venv (le plugin dépend des deux, `ansible-doc` ne le signale qu'à l'exécution) — installés
+- [x] Rôle Ansible `dns-interne` : bloc `/etc/hosts` (marker dédié, idempotent) généré depuis `groups['all']`/`hostvars[*].ansible_host` de l'inventaire dynamique, joué sur les 5 machines en fin de `site.yml`. Approche « hosts » retenue plutôt qu'un vrai unbound (plan : « suffisant à 6 machines ») — évite de rouvrir la zone de bugs DNS déjà rencontrée en Phase 6 (resolv.conf/systemd-resolved sur les LXC). N'inclut pas l'hôte PVE lui-même (jamais géré par Ansible dans ce repo, hors périmètre)
+- [x] Job CI `sync-netbox` (`.github/workflows/sync-netbox.yml`, déclenché sur push `main` touchant `kubernetes/tenants/*.values.yaml`) + script `scripts/sync_netbox_tenants.py` (pynetbox) : crée/met à jour un Tenant NetBox par fichier, custom field `namespace` = `cust-<name>` (convention du chart `onboarding-client`). Custom field `namespace` créé sur le modèle Tenant côté NetBox. Testé en local sur `test.values.yaml` : création puis re-run idempotent (update) confirmés
+  - ⚠ **Reste à faire manuellement** : secret repo GitHub `NETBOX_TOKEN` (le job y fait référence via `secrets.NETBOX_TOKEN`) — `gh` non authentifié dans cet environnement, impossible de le poser à distance depuis ici
+- [x] **Provisioning NetBox lui-même passé en Terraform** (`terraform/netbox.tf`, provider `e-breuninger/netbox`) — jusque-là, site/tenant/rôles/tag/custom field/5 VM+IP+services/prefixes n'existaient qu'en état live, créés à la main via des scripts one-off pendant la séance (rien en dehors de NetBox ne permettait de les reproduire). Décision explicite de l'utilisateur : tout détruire et laisser Terraform recréer, plutôt que `terraform import` un par un
+  - `locals.netbox_hosts` fusionne `local.vms` (vms.tf) et `local.containers` (containers.tf) avec le rôle NetBox attendu — un seul `terraform apply` crée désormais la VM/LXC réelle **et** son enregistrement NetBox à partir des mêmes valeurs name/ip, plus de duplication
+  - Chaîne de ressources par machine : `netbox_virtual_machine` → `netbox_interface` (eth0) → `netbox_ip_address` (rattachée à l'interface) → `netbox_primary_ip` (relie les deux) — le provider n'autorise pas de définir l'IP primaire directement sur la VM
+  - `netbox_device_role.color_hex` est **obligatoire** (pas de défaut) dans ce provider, contrairement à `netbox_tag.color_hex` qui en a un
+  - L'attribut `tags` (Set of String) des ressources prend le **nom** du tag (`"managed-by:ansible"`), pas son slug — confirmé par `apply` réel, non documenté explicitement dans le schéma
+  - Suppression live des 33 objets NetBox concernés avant le premier `apply` (services → IP → interfaces → VM → cluster/cluster-type → custom field/tag → rôles → tenant `interne` → prefixes → site, dans cet ordre pour éviter les FK bloquantes) ; le tenant `test` (propriété du job `sync-netbox`, pas de Terraform) n'a pas été touché
+  - Effet de bord découvert : supprimer puis recréer le custom field `namespace` a réinitialisé sa valeur à `null` sur le tenant `test` existant (les données custom field ne survivent pas à la suppression de leur définition, contrairement à une hypothèse initiale) — corrigé par un simple re-run de `sync_netbox_tenants.py` (idempotent)
+  - Avertissement `Possibly unsupported Netbox version` au plan/apply (NetBox 4.6.7 vs 4.6.5 testé par le provider) — non bloquant, purement informatif
+
+**✅ Validation** :
+- `ansible-inventory --list` reflète NetBox (5 hôtes, groupes `k3s_server`/`k3s_agents`/`teleport`/`iam`/`k3s_cluster` identiques à l'ancien inventaire statique)
+- Retrait du tag `managed_by_ansible` sur `k3s-w2` → disparaît de l'inventaire ; tag remis → réapparaît
+- `ansible-playbook site.yml --check --diff` : `changed=0` sur les 5 hôtes jusqu'au premier besoin de secret non fourni en ligne de commande (`keycloak_db_password`, attendu — identique avec l'ancien inventaire statique, non lié à ce chantier)
+- `dns-interne` appliqué pour de vrai (hors check mode) : idempotent au replay, résolution testée (`getent hosts` depuis `k3s-adm` résout `iam`/`teleport`/`k3s-w1`)
+- **Round-trip complet validé** : après destruction totale des objets NetBox et recréation via `terraform apply` (40 ressources), l'inventaire Ansible dynamique retrouve exactement les mêmes hôtes/groupes/IP qu'avant — preuve que NetBox peut maintenant être reconstruit intégralement depuis le code
 
 ---
 
@@ -313,6 +334,49 @@ Tâches récurrentes à planifier (pas un one-shot) :
 - [ ] Quota/LimitRange/netpol/PSA testés
 - [ ] Kubeconfig + doc kubelogin livrés
 - [ ] Contact + fenêtre de maintenance communiqués
+
+---
+
+## Hors-plan — Documentation (Docusaurus)
+
+> Ne fait partie d'aucune phase du plan initial — initiative de l'utilisateur en cours de
+> route ("je vais mettre en place un site avec Docusaurus"). Deux sites séparés, décidé
+> explicitement plutôt qu'un seul site à sections mélangées.
+
+- [x] **`docs-internal`** (`apps/docs-internal/`) : symlinke les 3 docs racine
+  (`plan-deploiement-dedibox.md`, `workflow-deploiement-dedibox.md`,
+  `disaster-recovery.md`) dans `docs/` — zéro duplication, toute future édition des
+  fichiers racine se répercute au prochain rebuild. Derrière **Teleport app_service**
+  (`docs-internal.teleport.aetheriscloud.fr`), même pattern que Vault/ArgoCD/Grafana/Gitea.
+  Lien "Docs" ajouté au portail (`infra-admins`)
+- [x] **`docs-public`** (`apps/docs-public/`) : squelette seul (une page "Introduction"),
+  aucun contenu existant ne convenait tel quel pour du client-facing. Public, Traefik +
+  cert-manager, `docs.aetheriscloud.fr` (DNS créé via l'API Gandi)
+- [x] ⚠ **Pas de Node.js sur le poste d'admin** : `brew install node` compile depuis les
+  sources (pas de bottle pour ce Mac — même symptôme déjà rencontré Phase 0 avec une
+  dépendance Rust transitive), tué après 61 minutes sans fin en vue. Scaffold Docusaurus
+  écrit à la main (structure standard, bien connue) plutôt que via `create-docusaurus` ;
+  le build réel (`npm install && npm run build`) se fait dans le Dockerfile, exécuté via
+  `podman` sur `k3s-w1` — jamais besoin de Node en local, même pattern que
+  `cert-manager-webhook-gandi`
+- [x] ⚠ **MDX casse sur la prose technique brute** : Docusaurus 3 traite les `.md` comme
+  du MDX par défaut, qui interprète tout `<` suivi d'un caractère comme un tag JSX — cassait
+  sur des tournures normales du runbook (`cert <15j`, `disque >80%`). Fixé une fois pour
+  toutes avec `markdown: { format: 'detect' }` dans `docusaurus.config.js` (`.md` → markdown
+  pur, MDX réservé aux `.mdx` explicites) plutôt que d'échapper chaque occurrence à la main
+- [x] ⚠ **`podman` sur k3s-w1 n'a pas de registre par défaut configuré** : `FROM
+  nginxinc/nginx-unprivileged:...` (nom court) échoue avec *"did not resolve to an alias
+  and no unqualified-search registries are defined"* — corrigé en qualifiant toutes les
+  images de base (`docker.io/...`) dans les deux Dockerfile
+- [x] Image `nginxinc/nginx-unprivileged` retenue plutôt que `nginx:alpine` — évite de
+  reproduire le bug PSA `restricted` déjà rencontré Phase 7 (`nginx:alpine` a besoin de
+  root pour `/var/cache/nginx`)
+
+**✅ Validation** : les deux pods `Running` après sync ArgoCD (annotation
+`argocd.argoproj.io/refresh: hard` pour ne pas attendre le polling) ·
+`docs-internal.teleport.aetheriscloud.fr` redirige bien vers le login Teleport (pas
+d'accès direct) · `docs.aetheriscloud.fr` sert la page réelle avec un certificat Let's
+Encrypt valide (`openssl s_client` confirme `CN=docs.aetheriscloud.fr`)
 
 ---
 

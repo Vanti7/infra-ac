@@ -16,6 +16,11 @@ const sidebars = {
       id: 'disaster-recovery',
       label: 'Reprise après sinistre',
     },
+    {
+      type: 'doc',
+      id: 'exploitation',
+      label: 'Exploitation — tâches courantes',
+    },
   ],
 };
 

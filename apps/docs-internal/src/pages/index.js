@@ -18,6 +18,11 @@ const docs = [
     title: 'Reprise après sinistre',
     description: "Procédure de reconstruction complète si l'hôte Proxmox est perdu.",
   },
+  {
+    href: '/docs/exploitation',
+    title: 'Exploitation — tâches courantes',
+    description: "Accès rapides, secrets ksops, onboarding client, resync ArgoCD.",
+  },
 ];
 
 export default function Home() {

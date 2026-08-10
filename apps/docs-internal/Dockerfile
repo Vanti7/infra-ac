@@ -1,7 +1,9 @@
 # Build depuis la racine du repo (pas apps/docs-internal/) : ce site inclut par
-# copie directe les 3 docs qui vivent à la racine (plan/workflow/disaster-recovery),
-# symlinkées dans docs/ pour l'édition locale mais copiées en dur ici pour ne pas
-# dépendre du comportement de COPY sur des symlinks qui sortent du contexte de build.
+# copie directe les docs qui vivent à la racine (plan/workflow/disaster-recovery/
+# exploitation), symlinkées dans docs/ pour l'édition locale mais copiées en dur ici
+# pour ne pas dépendre du comportement de COPY sur des symlinks qui sortent du
+# contexte de build. Toute nouvelle doc ajoutée à la racine + symlinkée dans
+# apps/docs-internal/docs/ + listée dans sidebars.js doit aussi être ajoutée ici.
 #
 #   podman build -f apps/docs-internal/Dockerfile -t docs-internal:<tag> .
 
@@ -12,7 +14,7 @@ COPY apps/docs-internal/package.json ./
 RUN npm install
 
 COPY apps/docs-internal/ ./
-COPY plan-deploiement-dedibox.md workflow-deploiement-dedibox.md disaster-recovery.md ./docs/
+COPY plan-deploiement-dedibox.md workflow-deploiement-dedibox.md disaster-recovery.md exploitation.md ./docs/
 
 RUN npm run build
 

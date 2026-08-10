@@ -4,14 +4,17 @@
 > disque mort, réinstallation nécessaire. **La Phase 8 (backups) n'est pas faite** : ce
 > document décrit comment reconstruire l'architecture depuis le code, pas comment
 > récupérer les données. Tout ce qui n'est que dans une base de données vivante
-> (Vault, Gitea, Harbor, NetBox, sessions Keycloak) est considéré perdu — c'est le
-> risque explicitement accepté en attendant que le NAS maison soit prêt.
+> (Gitea, Harbor, NetBox, sessions Keycloak) est considéré perdu — c'est le risque
+> explicitement accepté en attendant que le NAS maison soit prêt.
 >
 > Écrit le 2026-08-04 en auditant l'état réel de la stack (configs live relues sur
 > l'hôte, pas juste le plan de déploiement) — corrige au passage plusieurs écarts entre
-> ce que `plan-deploiement-dedibox.md` décrit et ce qui tourne réellement.
+> ce que `plan-deploiement-dedibox.md` décrit et ce qui tourne réellement. Révisé le
+> 2026-08-10 suite à l'audit `audit-infra-ac.md` : Vault retiré (C5), inventaire Ansible
+> découplé de NetBox (C4), secrets Ansible/k8s chiffrés SOPS/ksops (C3) — la procédure
+> ci-dessous est plus courte qu'avant, pas juste corrigée.
 
-## 0. Le vrai point de rupture : `secrets/`
+## 0. Le vrai point de rupture : `secrets/` + la clé age
 
 Rien de ce qui suit n'est possible sans le dossier `secrets/` de ce repo (gitignored,
 **uniquement sur ce Mac**, jamais copié ailleurs). Avant de commencer, vérifier qu'on a
@@ -21,28 +24,38 @@ toujours accès à :
 - `ssh/dedibox_root`, `ssh/vm_admin` — accès root à l'hôte et admin aux VM/LXC
 - `wg_mac_private.key` (+ la conf WireGuard côté Mac) — sans ça, plus aucun accès admin
   au réseau interne (10.42.0.0/24), ni SSH, ni UI Proxmox, ni Keycloak `/admin`
-- `keycloak_admin_password.txt`, `keycloak_db_password.txt`
-- `vault_init.json` (token root + 5 clés unseal) — **si ce fichier est perdu en même
-  temps que Proxmox, tout ce qui était dans Vault est irrécupérable même en théorie**
-- `k3s_token.txt`, `netbox_api_token.txt`, tous les `*_oidc_client_secret.txt`
+- `keycloak_admin_password.txt`
+- `netbox_api_token.txt`, `github.token`/`ghcr_pull_token.txt`
+
+**La clé age privée** (`~/.config/sops/age/keys.txt`, hors de `secrets/` — générée en
+Phase 0, sauvegardée hors-machine dans une note Bitwarden) mérite une mention à part :
+depuis C3 (audit), c'est elle qui déchiffre **tout** — `ansible/group_vars/all/secrets.sops.yaml`
+(gandi/keycloak/k3s/ghcr) **et** tout `kubernetes/secrets/*.enc.yaml` via ksops côté
+ArgoCD. Elle doit être redéployée à **deux** endroits distincts sur une reconstruction,
+détaillé en §3.4 et §3.6 — vérifier maintenant, avant d'en avoir besoin, que la note
+Bitwarden est toujours à jour et accessible.
 
 Si ce Mac est aussi hors service, ce document ne sert à rien : c'est le vrai single
 point of failure du projet, plus critique que Proxmox lui-même.
 
 ## 1. Ce qui est perdu (rappel)
 
-- Toutes les données Vault (secrets, policies) — nouvelles clés d'unseal à générer
 - Tous les dépôts hébergés sur Gitea — **sauf ce repo `infra-ac` lui-même**, qui reste
   sur GitHub (`Vanti7/infra-ac`), indépendant de Proxmox
 - Toutes les images Harbor — rebuildables depuis le source pour `portal`
-  ([apps/portal/Dockerfile](apps/portal/Dockerfile)), à refaire à la main pour
-  `cert-manager-webhook-gandi` (recette documentée dans
-  [kubernetes/platform/cert-manager/README.md](kubernetes/platform/cert-manager/README.md),
-  mais le code patché n'est pas vendorisé dans ce repo)
+  ([apps/portal/Dockerfile](apps/portal/Dockerfile)) et pour `docs-internal`/`docs-public`.
+  `cert-manager-webhook-gandi` n'est plus sur Harbor (cf. §3.6/C4) : image publique sur
+  `ghcr.io`, mais le code patché lui-même n'est toujours pas vendorisé dans ce repo
+  (recette dans [kubernetes/platform/cert-manager/README.md](kubernetes/platform/cert-manager/README.md),
+  dette ouverte, cf. §4)
 - L'IPAM NetBox au-delà de ce que `terraform/netbox.tf` sait recréer (tout ce qui a été
   ajouté à la main par la suite, un vrai tenant client par exemple)
-- Les comptes/sessions Keycloak au-delà de la structure du realm (à recréer, cf. §3.6)
+- Les comptes/sessions Keycloak au-delà de la structure du realm (à recréer, cf. §3.5)
 - Dashboards Grafana, historique Prometheus/Alertmanager
+- Les secrets applicatifs **pas encore migrés vers ksops** (migration en cours, C3) —
+  tant qu'un secret n'a pas son `.enc.yaml` dans `kubernetes/secrets/`, il n'existe que
+  dans le cluster live et doit être recréé à la main (mot de passe DB Gitea, secret
+  client OIDC de chaque appli, etc.)
 
 ## 2. Ordre de reconstruction
 
@@ -219,10 +232,11 @@ l'IP interne directement une fois HAProxy en place.
 > 10.42.0.0/24). Rien à reproduire ici, mais si un futur `apt upgrade`/audit le
 > remarque, ce n'est pas une régression.
 
-### 3.3 Terraform — VM/LXC (sans NetBox pour l'instant)
+### 3.3 Terraform — VM/LXC + inventaire Ansible
 
 `terraform/netbox.tf` va échouer tant que NetBox n'existe pas (voir §3.7) — scoper le
-premier apply aux ressources Proxmox uniquement :
+premier apply aux ressources Proxmox **et** au générateur d'inventaire (`local_file`,
+qui ne dépend que de `local.netbox_hosts`, pas de NetBox lui-même) :
 
 ```bash
 cd terraform
@@ -233,53 +247,36 @@ terraform apply \
   -target=proxmox_virtual_environment_vm.debian_template \
   -target=proxmox_download_file.debian_lxc_template \
   -target=proxmox_virtual_environment_vm.k3s \
-  -target=proxmox_virtual_environment_container.this
+  -target=proxmox_virtual_environment_container.this \
+  -target=local_file.ansible_inventory
 ```
 
 Recrée le template Debian, les 3 VM k3s et les 2 LXC (teleport, iam) avec les mêmes
-IP que toujours (`terraform/vms.tf`, `terraform/containers.tf`).
+IP que toujours (`terraform/vms.tf`, `terraform/containers.tf`), **et** génère
+`ansible/inventory/terraform.yml` — déjà l'inventaire par défaut de `ansible.cfg`.
+Plus besoin d'inventaire de secours à écrire à la main (l'ancien piège circulaire
+NetBox↔Ansible : voir §4, résolu).
 
-### 3.4 Ansible — inventaire de secours
+### 3.4 Déployer la clé age (1/2) + Ansible
 
-**Problème non résolu par ce document** (voir §4) : l'inventaire Ansible par défaut
-(`ansible/inventory/netbox.yml`) interroge NetBox, qui n'existe pas encore à ce stade
-(il tourne dans k3s, qui vient d'être recréé vide). Écrire à la main un inventaire
-temporaire le temps du premier tour :
-
-```yaml
-# /tmp/inventory-secours.yml — à jeter une fois NetBox revenu (§3.8)
-all:
-  vars:
-    ansible_user: admin
-k3s_server:
-  hosts:
-    k3s-adm: { ansible_host: 10.42.0.11 }
-k3s_agents:
-  hosts:
-    k3s-w1: { ansible_host: 10.42.0.21 }
-    k3s-w2: { ansible_host: 10.42.0.22 }
-teleport:
-  vars: { is_container: true }
-  hosts:
-    teleport: { ansible_host: 10.42.0.5 }
-iam:
-  vars: { is_container: true }
-  hosts:
-    iam: { ansible_host: 10.42.0.6 }
-k3s_cluster:
-  children: { k3s_server: {}, k3s_agents: {} }
-```
+Restaurer `~/.config/sops/age/keys.txt` depuis la note Bitwarden sur le poste admin
+(`chmod 600`), et vérifier que `SOPS_AGE_KEY_FILE` pointe dessus (normalement déjà dans
+`~/.zshrc`, cf. Phase 0 — sops ne cherche pas ce chemin par défaut sur macOS,
+contrairement à Linux). Sans ça, `community.sops` ne peut rien déchiffrer et
+`ansible-playbook` échouera sur `gandi_api_token`/`keycloak_admin_password`/
+`keycloak_db_password`/`k3s_token`/`ghcr_pull_token` — undefined.
 
 ```bash
 cd ansible
-ansible-playbook site.yml -i /tmp/inventory-secours.yml \
-  -e keycloak_db_password="$(cat ../secrets/keycloak_db_password.txt)" \
-  -e gandi_api_token="$(cat ../secrets/gandi.token)"
-  # + toute autre var sensible que site.yml réclame (relire les erreurs, elles
-  # nomment la variable manquante une par une)
+ansible-galaxy collection install -r requirements.yml   # community.sops, netbox.netbox
+ansible-playbook site.yml
 ```
 
-Ça réinstalle base/Keycloak/Teleport/k3s/dns-interne sur les 5 machines fraîches.
+Plus aucun `-e` à passer à la main : les 4 secrets Ansible + `ghcr_pull_token` viennent
+de `group_vars/all/secrets.sops.yaml`, déchiffré à la volée par `community.sops`
+(vars plugin, activé dans `ansible.cfg`). Ça réinstalle base/Keycloak/Teleport/k3s/
+dns-interne sur les 5 machines fraîches, containerd déjà configuré pour puller
+`ghcr.io` (webhook Gandi, cf. §3.6).
 
 ### 3.5 Keycloak — le realm n'est pas scripté
 
@@ -303,29 +300,46 @@ accessible uniquement depuis le WG) :
   correspondants (`argocd-secret` clé `oidc.keycloak.clientSecret`, etc. — chaque
   `application.yaml` sous `kubernetes/platform/` référence le nom exact)
 
-### 3.6 Bootstrap ArgoCD (manuel, hors GitOps par construction)
+### 3.6 Déployer la clé age (2/2) + bootstrap ArgoCD (manuel, hors GitOps par construction)
+
+Le repo-server ArgoCD monte la clé age via un Secret Kubernetes (`sops-age-key`,
+namespace `argocd`) — **il doit exister avant le premier démarrage du repo-server**,
+sinon le pod reste en erreur de montage de volume. C'est la deuxième (et dernière)
+fois qu'on touche à cette clé pendant toute la reconstruction :
 
 ```bash
 helm repo add argo https://argoproj.github.io/argo-helm
 kubectl create namespace argocd
+kubectl -n argocd create secret generic sops-age-key \
+  --from-file=keys.txt=~/.config/sops/age/keys.txt
 helm install argocd argo/argo-cd --version 10.2.2 -n argocd \
   -f kubernetes/bootstrap/values.yaml
 kubectl apply -f kubernetes/bootstrap/app-of-apps.yaml
 kubectl apply -f kubernetes/bootstrap/tenants-appset.yaml
 ```
 
-À partir de là, ArgoCD redéploie automatiquement tout `kubernetes/platform/` (Traefik,
-cert-manager + webhook Gandi, Vault, Gitea, Harbor, NetBox, monitoring, portail,
-teleport-agent). Tout revient **vide** :
+`kubernetes/bootstrap/values.yaml` contient déjà toute la config ksops (initContainer,
+volumes, `SOPS_AGE_KEY_FILE`) — rien à ajouter ici, c'est le même fichier que celui
+utilisé au quotidien.
 
-- **Vault** : `vault operator init` génère de nouvelles clés d'unseal + un nouveau root
-  token (les anciennes, dans `secrets/vault_init.json`, ne servent plus à rien sur une
-  instance vierge) — tous les secrets qu'il contenait sont perdus
-- **Harbor** : registre vide. Rebuild + push `apps/portal` depuis son Dockerfile ;
-  pour `cert-manager-webhook-gandi`, refaire la recette du README (patch
-  `Apikey`→`Bearer` dans `gandiclient.go`, cf. §4)
+À partir de là, ArgoCD redéploie automatiquement tout `kubernetes/platform/` (Traefik,
+cert-manager + webhook Gandi, Gitea, Harbor, NetBox, monitoring, portail,
+teleport-agent, docs-internal/docs-public) **et** `kubernetes/secrets/` (Application
+dédiée `secrets` — tous les secrets déjà migrés en ksops reviennent déchiffrés et
+identiques automatiquement, cf. §4 pour l'état de la migration). Ce qui revient
+**vide** malgré tout :
+
+- **Harbor** : registre vide. Rebuild + push `apps/portal` et `apps/docs-internal`/
+  `apps/docs-public` depuis leurs Dockerfile (voir leurs README respectifs pour la
+  méthode podman-sur-k3s-w1, pas de Docker sur le poste admin macOS).
+  `cert-manager-webhook-gandi` n'est pas concerné : image publique sur `ghcr.io`,
+  pullable dès que `registries.yaml` est en place (§3.4) — mais si le **code** patché
+  est perdu, refaire la recette du README (patch `Apikey`→`Bearer` dans
+  `gandiclient.go`, cf. §4)
 - **Gitea** : vide, sauf si des dépôts autres que `infra-ac` y étaient hébergés (celui-ci
   reste sur GitHub)
+- **Tout secret pas encore dans `kubernetes/secrets/`** : à recréer à la main
+  (`kubectl create secret ...`), le temps que la migration ksops (§4) avance
 
 ### 3.7 NetBox — repeupler via Terraform
 
@@ -340,24 +354,21 @@ terraform apply
 
 Recrée site/tenant/rôles/tag/custom field/5 VM+IP+services/prefixes (`terraform/netbox.tf`).
 Puis rejouer le job `sync-netbox` (ou `python3 scripts/sync_netbox_tenants.py` en local)
-pour les tenants clients réels.
-
-### 3.8 Bascule finale
-
-Une fois NetBox up et repeuplé, l'inventaire dynamique (`ansible/inventory/netbox.yml`,
-déjà la config par défaut de `ansible.cfg`) redevient utilisable — jeter
-`/tmp/inventory-secours.yml`. Valider : `ansible-inventory --graph` doit retrouver
-exactement les mêmes 5 hôtes/groupes qu'avant (déjà testé une fois en conditions
-réelles le 2026-08-04, cf. `workflow-deploiement-dedibox.md` §10.4).
+pour les tenants clients réels. L'inventaire Ansible, lui, n'a jamais dépendu de NetBox
+(§3.3) — rien à rebasculer, `ansible/inventory/netbox.yml` reste disponible en option
+si on veut vérifier que NetBox reflète bien le parc.
 
 ## 4. Dette laissée ouverte par ce document
 
-Ce document explique comment reconstruire à la main ce qui ne l'est pas encore. Deux
-chantiers identifiés en même temps que cette procédure, pas encore faits :
+- **Vendoriser le patch `gandiclient.go`** (§3.6) dans ce repo au lieu de le laisser en
+  prose dans un README — évite de re-diagnostiquer le même bug `Apikey`/`Bearer` si le
+  code source du fork amont disparaît
+- **Migration ksops incomplète** (C3) : au 2026-08-10, seule la plomberie est validée
+  (`kubernetes/secrets/` existe, l'Application `secrets` tourne) mais aucun des ~8
+  secrets applicatifs réels n'y est encore — ils exigent donc tous une recréation
+  manuelle en cas de reconstruction (§3.6). Se référer à `workflow-deploiement-dedibox.md`
+  pour l'avancement au moment de la lecture
 
-1. **Committer l'inventaire de secours** (§3.4) en dur dans le repo au lieu de le
-   réécrire à la main pendant un incident — supprime le tout premier point de blocage
-   circulaire (Ansible dépend de NetBox, NetBox dépend d'Ansible pour exister)
-2. **Vendoriser le patch `gandiclient.go`** (§3.6/Harbor) dans ce repo au lieu de le
-   laisser en prose dans un README — évite de re-diagnostiquer le même bug
-   `Apikey`/`Bearer` si Harbor est perdu
+~~Committer l'inventaire de secours en dur~~ — fait différemment et mieux : l'inventaire
+est maintenant généré par Terraform (`terraform/inventory.tf`), qui ne dépend que de
+Proxmox — plus de dépendance circulaire à contourner du tout (§3.3).

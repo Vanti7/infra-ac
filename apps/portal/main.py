@@ -18,7 +18,6 @@ REDIRECT_URI = f"{PUBLIC_URL}/callback"
 
 # Chaque outil : url, et groupe Keycloak requis pour le voir (None = tout le monde connecté).
 TOOLS = [
-    {"name": "Vault", "description": "Secrets & configs", "url": "https://vault.teleport.aetheriscloud.fr", "group": "infra-admins"},
     {"name": "ArgoCD", "description": "GitOps / déploiements", "url": "https://argocd.teleport.aetheriscloud.fr", "group": "infra-admins"},
     # Harbor n'est pas derrière Teleport (son externalURL sert aussi à l'auth
     # registre pour containerd — cf. workflow) : Traefik direct à la place,

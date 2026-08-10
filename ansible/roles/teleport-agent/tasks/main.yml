@@ -32,6 +32,22 @@
     path: /var/lib/teleport/host_uuid
   register: teleport_joined
 
+- name: Générer un jeton de join Teleport à la volée (TTL court, usage unique)
+  command: tctl tokens add --type=node --ttl=1h --format=json
+  delegate_to: "{{ groups['teleport'][0] }}"
+  register: teleport_token_result
+  changed_when: false
+  when: not teleport_joined.stat.exists
+  # Pas de secret statique à documenter/stocker : contrairement à k3s_token
+  # (pré-partagé, doit être identique des deux côtés), un join token Teleport
+  # n'est utile qu'une fois, à la création du nœud — le générer ici évite
+  # d'avoir à le committer nulle part, même chiffré.
+
+- name: Extraire le jeton généré
+  set_fact:
+    teleport_join_token: "{{ (teleport_token_result.stdout | from_json).token }}"
+  when: not teleport_joined.stat.exists
+
 - name: Déployer /etc/teleport.yaml (join token, seulement au premier join)
   template:
     src: teleport.yaml.j2

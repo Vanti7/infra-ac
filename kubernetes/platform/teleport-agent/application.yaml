@@ -20,9 +20,6 @@ spec:
           create: false
           name: teleport-kube-agent-join-token
         apps:
-          - name: vault
-            uri: http://vault.vault.svc.cluster.local:8200
-            public_addr: vault.teleport.aetheriscloud.fr
           - name: argocd
             uri: http://argocd-server.argocd.svc.cluster.local:80
             public_addr: argocd.teleport.aetheriscloud.fr

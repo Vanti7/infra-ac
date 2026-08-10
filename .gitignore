@@ -1,7 +1,7 @@
 # Secrets — ne jamais committer
 *.secret.yaml
 *.secret.env
-secrets/
+/secrets/
 .env
 .env.*
 

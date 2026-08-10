@@ -17,6 +17,10 @@ age-keys.txt
 *.tfvars
 !*.tfvars.example
 
+# Généré par terraform/inventory.tf à chaque apply — pas une source de vérité,
+# ne jamais committer (regénéré depuis terraform/vms.tf + containers.tf).
+ansible/inventory/terraform.yml
+
 # Divers
 .DS_Store
 .venv/

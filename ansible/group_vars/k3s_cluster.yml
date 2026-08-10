@@ -7,3 +7,7 @@ k3s_server_url: "https://10.42.0.11:6443"
 # qu'il est passé derrière Traefik avec un vrai certificat Let's Encrypt
 # (harbor.aetheriscloud.fr) — pull HTTPS standard, aucune config spéciale.
 k3s_registry_host: "10.42.0.11:30300"
+
+# ghcr_pull_token (le PAT lui-même, lecture seule) vit dans
+# group_vars/all/secrets.sops.yaml, chiffré — jamais ici en clair.
+ghcr_pull_username: "Vanti7"

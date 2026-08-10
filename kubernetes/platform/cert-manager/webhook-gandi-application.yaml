@@ -14,9 +14,12 @@ spec:
         # Image construite et revue par nous-mêmes (kubernetes/platform/cert-manager/README.md) :
         # le fork communautaire d'origine n'a pas de release maintenue, image publique
         # la plus utilisée datant de 2021.
+        # Sur ghcr.io et pas Harbor (C4 de l'audit) : Harbor tire son cert du ClusterIssuer,
+        # qui a besoin de ce webhook pour émettre — le mettre sur Harbor créait un deadlock
+        # au cold start (pas de webhook -> pas de cert -> pas de pull -> pas de webhook).
         groupName: acme.aetheriscloud.fr
         image:
-          repository: harbor.aetheriscloud.fr/aetheriscloud/cert-manager-webhook-gandi
+          repository: ghcr.io/vanti7/cert-manager-webhook-gandi
           tag: 0.2.1-aetheris
         certManager:
           namespace: cert-manager

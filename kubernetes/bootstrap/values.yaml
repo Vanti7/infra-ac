@@ -11,7 +11,7 @@ configs:
       name: Keycloak
       issuer: https://sso.aetheriscloud.fr/realms/infra
       clientID: argocd
-      clientSecret: $argocd-secret:oidc.keycloak.clientSecret
+      clientSecret: $argocd-oidc-secret:oidc.clientSecret
       requestedScopes:
         - openid
         - profile

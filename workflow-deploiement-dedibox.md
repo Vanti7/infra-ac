@@ -380,6 +380,85 @@ Encrypt valide (`openssl s_client` confirme `CN=docs.aetheriscloud.fr`)
 
 ---
 
+## Hors-plan — Remédiation de l'audit `audit-infra-ac.md`
+
+> Audit externe déposé dans le repo le 2026-08-10 (42 commits, phases 0→7+10 relues).
+> Décision explicite : pas de reconstruction complète (les 6 lots proposés) mais des
+> **corrections ciblées sur le système qui tourne**, en commençant par les critiques
+> faisables sans RAID (C1, C3, C4, C5) — C2 (RAID/backups) reste bloqué sur le NAS
+> maison, C5 tranché en faveur du retrait plutôt que du renforcement de Vault.
+
+- [x] **C1 — Repo public** : vérifié vrai via l'API GitHub (`private: false`), corrigé
+  immédiatement (`gh repo edit --visibility private` via API) — aucune reconstruction
+  requise, un seul appel API
+- [x] **C5 — Vault retiré** : standalone, storage `file`, unseal manuel, n'apportait
+  rien face à SOPS+Keycloak+Teleport déjà en place (arbitrage explicite : retirer,
+  pas renforcer). Nettoyage complet vérifié : Application + namespace ArgoCD, entrée
+  `apps:` Teleport, lien portail, **et** client OIDC Keycloak supprimé via `kcadm.sh`
+  en local sur `iam` (l'accès `/admin` externe est bloqué par PROXY protocol depuis la
+  Phase 6, `kcadm.sh` en local contourne proprement)
+- [x] **C4 — Dépendance circulaire cert-manager-webhook-gandi ↔ Harbor** : image
+  déplacée vers `ghcr.io/vanti7/cert-manager-webhook-gandi` (privée, PAT lecture seule
+  dans `registries.yaml` via `community.sops` — pas le PAT d'écriture utilisé pour les
+  push CI, principe de moindre privilège appliqué aux 3 nœuds k3s). Testé : pull
+  confirmé via `crictl` après redémarrage containerd (handler Ansible déjà en place)
+- [x] **C3 — Secrets chiffrés dans Git (SOPS/Ansible + ksops/ArgoCD)** :
+  - `community.sops` (vars plugin, `ansible.cfg`) pour les secrets Ansible —
+    `gandi_api_token`, `keycloak_admin_password`, `keycloak_db_password`, `k3s_token`,
+    `ghcr_pull_token` dans `ansible/group_vars/all/secrets.sops.yaml`. Le join token
+    Teleport n'a plus besoin d'exister comme variable : généré à la volée via `tctl`
+    à chaque run (`delegate_to` le host teleport), TTL 1h, jamais stocké
+  - **ksops** posé sur le repo-server ArgoCD (`kubernetes/bootstrap/values.yaml` :
+    initContainer `viaductoss/ksops`, montage de `sops-age-key`, `SOPS_AGE_KEY_FILE`,
+    `kustomize.buildOptions: --enable-alpha-plugins --enable-exec`)
+  - ⚠ **Piège trouvé en testant** : le directory-recurse d'ArgoCD (app `platform`,
+    `directory.recurse: true`) ne détecte `kustomization.yaml` qu'à la racine du
+    `source.path` d'une Application — jamais en récursif dans un sous-dossier. Un
+    premier essai avec un générateur ksops niché dans `kubernetes/platform/_ksops-test/`
+    échouait silencieusement (`could not find viaduct.ai/ksops`, appliqué comme
+    manifest brut). Corrigé avec une Application dédiée (`secrets`,
+    `kubernetes/platform/secrets/application.yaml`) pointant directement sur
+    `kubernetes/secrets/`
+  - ⚠ **`.gitignore` non ancré** : `secrets/` (sans `/` en tête) masquait
+    silencieusement tout dossier nommé "secrets" ailleurs dans l'arbre, dont
+    `kubernetes/secrets/` lui-même — corrigé en `/secrets/`
+  - **12 secrets applicatifs migrés** : `gitea-db-secret`, `gitea-oauth-keycloak`,
+    `harbor-admin-secret`, `netbox-superuser`, `netbox-postgresql-fixed`,
+    `netbox-valkey-fixed`, `netbox-sso-config`, `gandi-credentials`, `portal-secrets`,
+    `grafana-oidc-secret`, `grafana-admin-secret`, `argocd-oidc-secret`. Valeurs
+    extraites du cluster live, chiffrées, resynced — **zéro redémarrage de pod**
+    constaté (`Synced` sans diff = valeurs identiques, vérifié namespace par namespace)
+  - `argocd-secret` **volontairement exclu** : mélange des clés auto-gérées par le
+    chart (`server.secretkey`, `admin.password`) et de notre `oidc.keycloak.clientSecret`
+    — ksops-gérer le tout aurait figé les clés du chart. Le client OIDC ArgoCD référence
+    à la place un secret dédié (`argocd-oidc-secret`, syntaxe `$secret:clé` d'ArgoCD,
+    nécessite le label `app.kubernetes.io/part-of: argocd`), appliqué via `helm upgrade`
+  - `sops-age-key` reste hors ksops par nécessité (la clé ne peut pas se chiffrer
+    elle-même) — procédure de redéploiement documentée dans `disaster-recovery.md`
+- [x] **Dépendance circulaire supplémentaire, repérée par l'utilisateur en cours de
+  route** (pas dans l'audit initial) : l'inventaire Ansible dynamique dépendait de
+  NetBox, qui tourne dans k3s — donc rien pour amorcer un cluster neuf. Inventaire
+  généré par Terraform à la place (`terraform/inventory.tf`, `local_file` depuis les
+  mêmes données que `netbox.tf`), qui ne dépend que de Proxmox. NetBox reste
+  disponible comme inventaire secondaire (`ansible/inventory/netbox.yml`)
+- [x] `disaster-recovery.md` mis à jour en conséquence : procédure de déploiement de
+  la clé age (les deux endroits où elle intervient), retrait des mentions Vault,
+  suppression de la section « inventaire de secours » (obsolète)
+
+**✅ Validation** : les 3 commits d'origine + 1 commit de correctif ksops + 1 commit de
+migration de secrets + 1 commit ArgoCD, tous poussés et synced · `ansible-playbook
+site.yml --check` passe sans aucun `-e` manuel · secret de test chiffré→déchiffré→créé
+en direct avant migration réelle · les 12 secrets réels vérifiés `Synced` sans
+redémarrage de pod · `/auth/login` ArgoCD répond normalement après le changement de
+référence OIDC
+
+**Dette encore ouverte** (voir aussi `disaster-recovery.md` §4) : vendoriser le patch
+`gandiclient.go` plutôt que de le laisser en prose dans un README ; C2 (RAID/backups)
+toujours bloqué sur le NAS maison ; lots I6-I13/M14-M20 de l'audit non traités
+(NetworkPolicy plateforme, Harbor public, probes, `whoami` de test, CI, README racine).
+
+---
+
 ## Dépendances entre phases
 
 ```

@@ -52,10 +52,11 @@ point of failure du projet, plus critique que Proxmox lui-même.
   ajouté à la main par la suite, un vrai tenant client par exemple)
 - Les comptes/sessions Keycloak au-delà de la structure du realm (à recréer, cf. §3.5)
 - Dashboards Grafana, historique Prometheus/Alertmanager
-- Les secrets applicatifs **pas encore migrés vers ksops** (migration en cours, C3) —
-  tant qu'un secret n'a pas son `.enc.yaml` dans `kubernetes/secrets/`, il n'existe que
-  dans le cluster live et doit être recréé à la main (mot de passe DB Gitea, secret
-  client OIDC de chaque appli, etc.)
+- Rien côté secrets applicatifs courants : les 12 principaux (DB Gitea, OIDC de chaque
+  appli, admin Harbor/NetBox/Grafana, token Gandi...) sont chiffrés dans
+  `kubernetes/secrets/` (ksops, C3) et reviennent automatiquement avec ArgoCD (§3.6).
+  Ce qui reste hors ksops par choix : `sops-age-key` (redéployée à la main, §3.4/§3.6)
+  et le join token Teleport (éphémère, régénéré à chaque run, §3.4)
 
 ## 2. Ordre de reconstruction
 
@@ -338,8 +339,9 @@ identiques automatiquement, cf. §4 pour l'état de la migration). Ce qui revien
   `gandiclient.go`, cf. §4)
 - **Gitea** : vide, sauf si des dépôts autres que `infra-ac` y étaient hébergés (celui-ci
   reste sur GitHub)
-- **Tout secret pas encore dans `kubernetes/secrets/`** : à recréer à la main
-  (`kubectl create secret ...`), le temps que la migration ksops (§4) avance
+
+Tous les autres secrets applicatifs (DB, OIDC, admin) reviennent **identiques**
+automatiquement via l'Application dédiée `secrets` — rien à recréer à la main pour eux.
 
 ### 3.7 NetBox — repeupler via Terraform
 
@@ -363,11 +365,11 @@ si on veut vérifier que NetBox reflète bien le parc.
 - **Vendoriser le patch `gandiclient.go`** (§3.6) dans ce repo au lieu de le laisser en
   prose dans un README — évite de re-diagnostiquer le même bug `Apikey`/`Bearer` si le
   code source du fork amont disparaît
-- **Migration ksops incomplète** (C3) : au 2026-08-10, seule la plomberie est validée
-  (`kubernetes/secrets/` existe, l'Application `secrets` tourne) mais aucun des ~8
-  secrets applicatifs réels n'y est encore — ils exigent donc tous une recréation
-  manuelle en cas de reconstruction (§3.6). Se référer à `workflow-deploiement-dedibox.md`
-  pour l'avancement au moment de la lecture
+
+~~Migration ksops incomplète~~ — faite le 2026-08-10 : 12 secrets applicatifs migrés
+(`kubernetes/secrets/`), zéro redémarrage de pod constaté au sync. `argocd-secret`
+reste volontairement hors ksops (mélange chart+custom, cf. `kubernetes/secrets/kustomization.yaml`) ;
+le client OIDC ArgoCD passe par un secret dédié (`argocd-oidc-secret`) à la place.
 
 ~~Committer l'inventaire de secours en dur~~ — fait différemment et mieux : l'inventaire
 est maintenant généré par Terraform (`terraform/inventory.tf`), qui ne dépend que de

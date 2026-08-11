@@ -4,7 +4,7 @@ metadata:
   name: harbor
   namespace: argocd
 spec:
-  project: default
+  project: platform
   source:
     repoURL: https://helm.goharbor.io
     chart: harbor

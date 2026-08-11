@@ -4,7 +4,7 @@ metadata:
   name: cert-manager-webhook-gandi
   namespace: argocd
 spec:
-  project: default
+  project: platform
   source:
     repoURL: https://bwolf.github.io/cert-manager-webhook-gandi
     chart: cert-manager-webhook-gandi

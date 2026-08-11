@@ -4,7 +4,7 @@ metadata:
   name: teleport-kube-agent
   namespace: argocd
 spec:
-  project: default
+  project: platform
   source:
     repoURL: https://charts.releases.teleport.dev
     chart: teleport-kube-agent

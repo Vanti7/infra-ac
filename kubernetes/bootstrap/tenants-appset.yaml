@@ -14,7 +14,7 @@ spec:
     metadata:
       name: "tenant-{{name}}"
     spec:
-      project: default
+      project: tenants
       source:
         repoURL: git@github.com:Vanti7/infra-ac.git
         targetRevision: main

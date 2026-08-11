@@ -1,0 +1,14 @@
+# I9 : le projet `default` (créé automatiquement par ArgoCD, impossible à
+# supprimer) reste vide et sans droits. Toute Application oubliée dessus
+# (au lieu de `platform`/`tenants`) est bloquée au lieu d'hériter d'un accès
+# total au cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: argocd
+spec:
+  description: Projet par défaut — volontairement vide, aucune app ne doit l'utiliser
+  sourceRepos: []
+  destinations: []
+  clusterResourceWhitelist: []

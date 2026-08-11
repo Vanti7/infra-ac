@@ -26,7 +26,12 @@ spec:
         - {protocol: UDP, port: 53}
         - {protocol: TCP, port: 53}
     - to:
-        - ipBlock: {cidr: 10.42.0.6/32}
+        # PAS 10.42.0.6 (IP interne Keycloak) : son nginx exige le protocole
+        # PROXY (fourni par HAProxy uniquement) et reset toute connexion
+        # directe. Chemin qui marche : hairpin par l'IP publique (résolution
+        # DNS normale de sso.aetheriscloud.fr, ressort par HAProxy avec
+        # PROXY protocol). Vérifié en direct.
+        - ipBlock: {cidr: 51.15.191.67/32}
       ports:
         - {protocol: TCP, port: 443}
     - to:

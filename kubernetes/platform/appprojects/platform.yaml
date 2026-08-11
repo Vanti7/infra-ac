@@ -1,8 +1,9 @@
 # I9 (audit) : toutes les Application tournaient en `project: default`
 # (aucune restriction de repo/destination/ressource cluster). Ce projet
 # couvre les apps plateforme (pas les tenants, cf. `tenants.yaml`) : les
-# repos Helm externes utilisés + le repo GitOps lui-même, et les seuls
-# namespaces plateforme comme destination.
+# repos Helm externes utilisés + le repo GitOps lui-même. Destination en
+# wildcard (voir plus bas pourquoi) : la frontière de sécurité réelle est
+# sourceRepos + clusterResourceWhitelist, pas la liste de namespaces.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -20,29 +21,14 @@ spec:
     - https://charts.netbox.oss.netboxlabs.com/
     - https://charts.releases.teleport.dev
     - https://traefik.github.io/charts
+  # L'app `secrets` (ksops) ne fixe pas de destination.namespace unique — ses
+  # ressources visent 7 namespaces différents (chaque Secret porte son propre
+  # metadata.namespace). Un wildcard ici ne change rien à CE qui est déployé
+  # (toujours limité aux namespaces écrits dans les manifestes) : la vraie
+  # frontière de sécurité, c'est sourceRepos + clusterResourceWhitelist.
   destinations:
     - server: https://kubernetes.default.svc
-      namespace: argocd
-    - server: https://kubernetes.default.svc
-      namespace: cert-manager
-    - server: https://kubernetes.default.svc
-      namespace: docs-internal
-    - server: https://kubernetes.default.svc
-      namespace: docs-public
-    - server: https://kubernetes.default.svc
-      namespace: gitea
-    - server: https://kubernetes.default.svc
-      namespace: harbor
-    - server: https://kubernetes.default.svc
-      namespace: monitoring
-    - server: https://kubernetes.default.svc
-      namespace: netbox
-    - server: https://kubernetes.default.svc
-      namespace: portal
-    - server: https://kubernetes.default.svc
-      namespace: teleport-agent
-    - server: https://kubernetes.default.svc
-      namespace: traefik
+      namespace: "*"
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

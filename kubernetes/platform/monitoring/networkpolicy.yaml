@@ -1,0 +1,49 @@
+# I6 : default-deny + allow explicites. Prometheus doit pouvoir scraper les
+# pods/services du cluster (kubelet inclus, hostNetwork sur les 3 nœuds) et
+# l'apiserver ; Grafana a besoin de Keycloak (OIDC) et de Teleport (accès
+# browser) ; Alertmanager a besoin d'Internet pour ntfy.sh (I7).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-default
+  namespace: monitoring
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: teleport-agent
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}
+    - to:
+        - ipBlock: {cidr: 10.44.0.0/16}
+    - to:
+        - ipBlock: {cidr: 10.43.0.0/16}
+    - to:
+        # kubelet (hostNetwork, métriques node/cAdvisor) sur les 3 nœuds
+        - ipBlock: {cidr: 10.42.0.11/32}
+        - ipBlock: {cidr: 10.42.0.21/32}
+        - ipBlock: {cidr: 10.42.0.22/32}
+      ports:
+        - {protocol: TCP, port: 10250}
+    - to:
+        - ipBlock: {cidr: 10.42.0.6/32}
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: ["10.42.0.0/24", "10.99.0.0/24"]
+      ports:
+        - {protocol: TCP, port: 443}

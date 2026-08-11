@@ -1,0 +1,39 @@
+# I6 (audit) : default-deny + allow explicites. But egress vers 10.42.0.1
+# (hôte PVE) et 10.99.0.0/24 (WireGuard) : jamais autorisé depuis un pod,
+# quel que soit le namespace plateforme. cert-manager a besoin d'Internet
+# (ACME Let's Encrypt + API Gandi pour le challenge DNS01), donc la règle
+# "internet" est un ipBlock 0.0.0.0/0 avec except sur les plages internes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cert-manager-default
+  namespace: cert-manager
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+      # Admission webhooks (cert-manager-webhook) appelés directement par
+      # kube-apiserver, qui tourne hostNetwork sur k3s-adm — pas un pod, donc
+      # ipBlock et non namespaceSelector.
+        - ipBlock:
+            cidr: 10.42.0.11/32
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: 10.43.0.1/32}
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - podSelector: {}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: ["10.42.0.0/24", "10.99.0.0/24"]

@@ -1,0 +1,41 @@
+# I6 : default-deny + allow explicites.
+# M18 : Gitea garde son accès web via Teleport (browser), mais gagne un accès
+# CLI (git clone/push en SSH) via le NodePort 30022 — jamais public, seulement
+# joignable depuis le réseau interne (10.42.0.0/24) ou WireGuard
+# (10.99.0.0/24), cf. exploitation.md. Le trafic NodePort peut arriver soit
+# SNATé à l'IP d'un nœud (10.42.0.0/24) soit avec l'IP WG d'origine selon le
+# chemin de routage — on autorise les deux, jamais Internet.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gitea-default
+  namespace: gitea
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: teleport-agent
+    - from:
+        - ipBlock: {cidr: 10.42.0.0/24}
+        - ipBlock: {cidr: 10.99.0.0/24}
+      ports:
+        - {protocol: TCP, port: 22}
+        - {protocol: TCP, port: 3000}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: 10.42.0.6/32}
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - podSelector: {}

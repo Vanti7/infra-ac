@@ -1,0 +1,37 @@
+# I6 : default-deny + allow explicites. Harbor est exposé publiquement via
+# Traefik (I11 : le projet redevient privé, mais l'ingress HTTP(S) reste
+# nécessaire pour les pulls/push authentifiés). Egress Internet nécessaire :
+# Trivy télécharge sa base CVE (aquasecurity), et un éventuel proxy cache
+# d'upstream.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: harbor-default
+  namespace: harbor
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: traefik
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: 10.42.0.6/32}
+      ports:
+        - {protocol: TCP, port: 443}
+    - to:
+        - podSelector: {}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: ["10.42.0.0/24", "10.99.0.0/24"]

@@ -1,0 +1,33 @@
+# I6 : default-deny + allow explicites. teleport-kube-agent est un connecteur
+# sortant (tunnel inversé vers le proxy Teleport) qui doit aussi pouvoir
+# atteindre les pods backend de chaque app_service (docs-internal, gitea,
+# grafana...) dans leurs namespaces respectifs — d'où l'egress large vers le
+# CIDR pods/services du cluster. Aucune entrée nécessaire (pas de trafic
+# entrant vers ce pod).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: teleport-agent-default
+  namespace: teleport-agent
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: 10.44.0.0/16}
+    - to:
+        - ipBlock: {cidr: 10.43.0.0/16}
+    - to:
+        - ipBlock: {cidr: 10.42.0.5/32}
+      ports:
+        - {protocol: TCP, port: 443}

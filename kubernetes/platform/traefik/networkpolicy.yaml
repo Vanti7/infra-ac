@@ -1,0 +1,29 @@
+# I6 : default-deny + allow explicites. Traefik ne reçoit du trafic que
+# depuis HAProxy sur l'hôte PVE (send-proxy-v2, cf. workflow §HAProxy) — une
+# des rares entrées légitimes depuis 10.42.0.1. Egress large vers le CIDR
+# pods/services : Traefik route vers des backends dans plusieurs namespaces
+# (docs-public, harbor, netbox, portal).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: traefik-default
+  namespace: traefik
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - ipBlock: {cidr: 10.42.0.1/32}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - ipBlock: {cidr: 10.44.0.0/16}
+    - to:
+        - ipBlock: {cidr: 10.43.0.0/16}

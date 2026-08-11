@@ -22,7 +22,7 @@ spec:
         apps:
           - name: argocd
             uri: http://argocd-server.argocd.svc.cluster.local:80
-            public_addr: argocd.teleport.aetheriscloud.fr
+            public_addr: argocd.ops.aetheriscloud.fr
           # Harbor volontairement absent : son externalURL sert aussi à générer
           # l'URL d'authentification que containerd utilise pour puller les
           # images (Www-Authenticate: realm=...). La faire pointer vers Teleport
@@ -30,13 +30,13 @@ spec:
           # reste en accès direct WG/NodePort (http://10.42.0.11:30002).
           - name: grafana
             uri: http://monitoring-grafana.monitoring.svc.cluster.local:80
-            public_addr: grafana.teleport.aetheriscloud.fr
+            public_addr: grafana.ops.aetheriscloud.fr
           - name: gitea
             uri: http://gitea-http.gitea.svc.cluster.local:3000
-            public_addr: gitea.teleport.aetheriscloud.fr
+            public_addr: gitea.ops.aetheriscloud.fr
           - name: docs-internal
             uri: http://docs-internal.docs-internal.svc.cluster.local:80
-            public_addr: docs-internal.teleport.aetheriscloud.fr
+            public_addr: docs-internal.ops.aetheriscloud.fr
         updater:
           enabled: true
   destination:

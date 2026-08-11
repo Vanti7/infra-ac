@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: portal
-          image: harbor.aetheriscloud.fr/aetheriscloud/portal:1.0.5
+          image: harbor.aetheriscloud.fr/aetheriscloud/portal:1.0.6
           ports:
             - containerPort: 8080
           env:

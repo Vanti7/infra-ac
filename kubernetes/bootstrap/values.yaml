@@ -6,7 +6,7 @@ configs:
     server.insecure: "true"
 
   cm:
-    url: "https://argocd.teleport.aetheriscloud.fr"
+    url: "https://argocd.ops.aetheriscloud.fr"
     oidc.config: |
       name: Keycloak
       issuer: https://sso.aetheriscloud.fr/realms/infra

@@ -18,15 +18,15 @@ REDIRECT_URI = f"{PUBLIC_URL}/callback"
 
 # Chaque outil : url, et groupe Keycloak requis pour le voir (None = tout le monde connecté).
 TOOLS = [
-    {"name": "ArgoCD", "description": "GitOps / déploiements", "url": "https://argocd.teleport.aetheriscloud.fr", "group": "infra-admins"},
+    {"name": "ArgoCD", "description": "GitOps / déploiements", "url": "https://argocd.ops.aetheriscloud.fr", "group": "infra-admins"},
     # Harbor n'est pas derrière Teleport (son externalURL sert aussi à l'auth
     # registre pour containerd — cf. workflow) : Traefik direct à la place,
     # vrai cert Let's Encrypt, SSO Keycloak propre à Harbor.
     {"name": "Harbor", "description": "Registre de conteneurs", "url": "https://harbor.aetheriscloud.fr", "group": "infra-admins"},
     {"name": "NetBox", "description": "IPAM / CMDB", "url": "https://netbox.aetheriscloud.fr", "group": "infra-admins"},
-    {"name": "Grafana", "description": "Monitoring", "url": "https://grafana.teleport.aetheriscloud.fr", "group": "infra-admins"},
-    {"name": "Gitea", "description": "Git", "url": "https://gitea.teleport.aetheriscloud.fr", "group": "infra-admins"},
-    {"name": "Docs", "description": "Documentation interne (ops)", "url": "https://docs-internal.teleport.aetheriscloud.fr", "group": "infra-admins"},
+    {"name": "Grafana", "description": "Monitoring", "url": "https://grafana.ops.aetheriscloud.fr", "group": "infra-admins"},
+    {"name": "Gitea", "description": "Git", "url": "https://gitea.ops.aetheriscloud.fr", "group": "infra-admins"},
+    {"name": "Docs", "description": "Documentation interne (ops)", "url": "https://docs-internal.ops.aetheriscloud.fr", "group": "infra-admins"},
     {"name": "Teleport", "description": "Accès SSH / Kubernetes (tsh)", "url": "https://teleport.aetheriscloud.fr", "group": None},
 ]
 

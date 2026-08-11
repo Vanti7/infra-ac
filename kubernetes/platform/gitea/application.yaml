@@ -43,8 +43,8 @@ spec:
             existingSecret: gitea-admin-secret
           config:
             server:
-              DOMAIN: gitea.teleport.aetheriscloud.fr
-              ROOT_URL: https://gitea.teleport.aetheriscloud.fr/
+              DOMAIN: gitea.ops.aetheriscloud.fr
+              ROOT_URL: https://gitea.ops.aetheriscloud.fr/
             database:
               DB_TYPE: postgres
               HOST: "gitea-postgresql:5432"

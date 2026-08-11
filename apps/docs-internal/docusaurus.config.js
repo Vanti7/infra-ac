@@ -7,7 +7,7 @@ const config = {
   tagline: 'Documentation interne infra',
   favicon: 'img/favicon.png',
 
-  url: 'https://docs-internal.teleport.aetheriscloud.fr',
+  url: 'https://docs-internal.ops.aetheriscloud.fr',
   baseUrl: '/',
 
   organizationName: 'aetheriscloud',

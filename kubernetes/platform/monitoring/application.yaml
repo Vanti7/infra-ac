@@ -64,7 +64,7 @@ spec:
                 key: CLIENT_SECRET
           grafana.ini:
             server:
-              root_url: https://grafana.teleport.aetheriscloud.fr
+              root_url: https://grafana.ops.aetheriscloud.fr
             auth.generic_oauth:
               enabled: true
               name: Keycloak

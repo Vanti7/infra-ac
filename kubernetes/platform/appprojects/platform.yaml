@@ -44,3 +44,5 @@ spec:
       kind: ValidatingWebhookConfiguration
     - group: apiregistration.k8s.io
       kind: APIService
+    - group: networking.k8s.io
+      kind: IngressClass

@@ -347,7 +347,7 @@ Tâches récurrentes à planifier (pas un one-shot) :
   (`plan-deploiement-dedibox.md`, `workflow-deploiement-dedibox.md`,
   `disaster-recovery.md`) dans `docs/` — zéro duplication, toute future édition des
   fichiers racine se répercute au prochain rebuild. Derrière **Teleport app_service**
-  (`docs-internal.teleport.aetheriscloud.fr`), même pattern que Vault/ArgoCD/Grafana/Gitea.
+  (`docs-internal.ops.aetheriscloud.fr`), même pattern que Vault/ArgoCD/Grafana/Gitea.
   Lien "Docs" ajouté au portail (`infra-admins`)
 - [x] **`docs-public`** (`apps/docs-public/`) : squelette seul (une page "Introduction"),
   aucun contenu existant ne convenait tel quel pour du client-facing. Public, Traefik +
@@ -374,7 +374,7 @@ Tâches récurrentes à planifier (pas un one-shot) :
 
 **✅ Validation** : les deux pods `Running` après sync ArgoCD (annotation
 `argocd.argoproj.io/refresh: hard` pour ne pas attendre le polling) ·
-`docs-internal.teleport.aetheriscloud.fr` redirige bien vers le login Teleport (pas
+`docs-internal.ops.aetheriscloud.fr` redirige bien vers le login Teleport (pas
 d'accès direct) · `docs.aetheriscloud.fr` sert la page réelle avec un certificat Let's
 Encrypt valide (`openssl s_client` confirme `CN=docs.aetheriscloud.fr`)
 
@@ -456,6 +456,14 @@ référence OIDC
 `gandiclient.go` plutôt que de le laisser en prose dans un README ; C2 (RAID/backups)
 toujours bloqué sur le NAS maison ; lots I6-I13/M14-M20 de l'audit non traités
 (NetworkPolicy plateforme, Harbor public, probes, `whoami` de test, CI, README racine).
+
+> **Correction ultérieure (2026-08-11)** : `<nom>.teleport.aetheriscloud.fr` (§Phase 6,
+> ci-dessus, et `docs-internal` ci-dessous) renommé en `<nom>.ops.aetheriscloud.fr` —
+> retour explicite de l'utilisateur, jamais consulté sur ce choix de sous-domaine à
+> l'origine (« ça fait trop lab » d'exposer le nom de l'outil d'accès dans l'URL).
+> DNS, règle SNI HAProxy, `public_addr` Teleport et `redirectUris`/`webOrigins`
+> Keycloak des 3 clients OIDC concernés mis à jour en conséquence. Détail dans
+> `disaster-recovery.md`.
 
 ---
 

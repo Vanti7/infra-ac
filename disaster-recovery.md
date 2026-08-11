@@ -199,7 +199,7 @@ frontend fe443
     tcp-request content accept if { req_ssl_hello_type 1 }
     use_backend bk_teleport if { req_ssl_sni -i teleport.aetheriscloud.fr }
     use_backend bk_teleport if { req_ssl_sni -m end -i .teleport.cluster.local }
-    use_backend bk_teleport if { req_ssl_sni -m end -i .teleport.aetheriscloud.fr }
+    use_backend bk_teleport if { req_ssl_sni -m end -i .ops.aetheriscloud.fr }
     use_backend bk_sso      if { req_ssl_sni -i sso.aetheriscloud.fr }
     use_backend bk_kubeapi  if { req_ssl_sni -i kube.aetheriscloud.fr }
     default_backend bk_ingress
@@ -293,7 +293,7 @@ accessible uniquement depuis le WG) :
   `netbox`, `portal` — chacun avec un mapper de groupe (`groups`, attribut client
   direct, **pas** de scope `groups` dédié — ce realm n'en a pas) et son
   `redirectUris` pointant vers son hostname réel (`https://<outil>.aetheriscloud.fr`
-  ou `.teleport.aetheriscloud.fr` selon l'outil, cf. [apps/portal/main.py](apps/portal/main.py)
+  ou `.ops.aetheriscloud.fr` selon l'outil, cf. [apps/portal/main.py](apps/portal/main.py)
   pour la liste à jour)
 - **Teleport n'a volontairement pas de client OIDC** : Teleport Community Edition ne
   supporte pas les connecteurs OIDC (Enterprise uniquement) — comptes locaux + WebAuthn

@@ -28,9 +28,13 @@ spec:
         - {protocol: UDP, port: 53}
         - {protocol: TCP, port: 53}
     - to:
-        - ipBlock: {cidr: 10.43.0.1/32}
+        # PAS 10.43.0.1 (ClusterIP du service kubernetes) : avec kube-router,
+        # le DNAT vers l'IP réelle (Endpoints = 10.42.0.11:6443, k3s-adm) a
+        # lieu avant l'évaluation du netpol egress, donc une règle sur le
+        # ClusterIP ne matche jamais le paquet réellement filtré.
+        - ipBlock: {cidr: 10.42.0.11/32}
       ports:
-        - {protocol: TCP, port: 443}
+        - {protocol: TCP, port: 6443}
     - to:
         - podSelector: {}
     - to:

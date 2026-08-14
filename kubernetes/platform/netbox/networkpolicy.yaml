@@ -35,10 +35,12 @@ spec:
         - podSelector: {}
     - to:
         # netbox-worker : initContainer wait-for-backend fait `kubectl
-        # rollout status` (apiserver). Régression découverte 3 jours après
-        # coup (crash loop au premier rollout suivant le déploiement d'I6) —
-        # le pod déjà en place avant le netpol tournait, seul un redémarrage
-        # révèle le blocage.
-        - ipBlock: {cidr: 10.43.0.1/32}
+        # rollout status` (apiserver). PAS 10.43.0.1 (ClusterIP du service
+        # kubernetes) : avec kube-router, le DNAT vers l'IP réelle
+        # (Endpoints du service kubernetes = 10.42.0.11:6443, k3s-adm) a
+        # lieu avant l'évaluation du netpol egress, donc une règle sur le
+        # ClusterIP ne matche jamais le paquet réellement filtré — "connection
+        # refused" au lieu d'un simple drop. Cibler l'IP réelle du nœud.
+        - ipBlock: {cidr: 10.42.0.11/32}
       ports:
-        - {protocol: TCP, port: 443}
+        - {protocol: TCP, port: 6443}

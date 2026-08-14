@@ -31,3 +31,11 @@ spec:
         - ipBlock: {cidr: 10.42.0.5/32}
       ports:
         - {protocol: TCP, port: 443}
+    - to:
+        # apiserver réel (PAS 10.43.0.1, le ClusterIP : DNAT avant netpol
+        # avec kube-router, cf. netbox). Le kube_cluster proxifie kubectl
+        # via Teleport jusqu'à l'apiserver, silencieux tant que personne ne
+        # fait de kubectl-via-tsh (le pod ne crash pas, la requête échoue).
+        - ipBlock: {cidr: 10.42.0.11/32}
+      ports:
+        - {protocol: TCP, port: 6443}

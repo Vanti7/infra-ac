@@ -80,6 +80,11 @@ spec:
                 webhook_configs:
                   - url: https://ntfy.sh/aetheriscloud-alerts-7e9d1f49912a95b5
                     send_resolved: true
+              # Le chart injecte une sous-route par défaut (alerte interne
+              # Watchdog, sert à vérifier que le pipeline Prometheus->
+              # Alertmanager tourne) qui référence ce nom de receiver —
+              # doit exister même vide, sinon l'operator refuse la config.
+              - name: "null"
 
         grafana:
           admin:

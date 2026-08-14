@@ -46,3 +46,5 @@ spec:
       kind: APIService
     - group: networking.k8s.io
       kind: IngressClass
+    - group: cert-manager.io
+      kind: ClusterIssuer

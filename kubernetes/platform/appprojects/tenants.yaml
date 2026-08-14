@@ -1,8 +1,8 @@
 # I9 : les Application tenant-* (générées par l'ApplicationSet) n'ont besoin
-# que du repo GitOps et des namespaces cust-*. clusterResourceWhitelist vide
-# volontairement : un chart tenant ne doit jamais pouvoir créer de ressource
-# cluster (ClusterRole, CRD...) — c'est la définition même de l'isolation
-# multi-tenant.
+# que du repo GitOps et des namespaces cust-*. clusterResourceWhitelist limité
+# à Namespace seul (CreateNamespace=true crée cust-<nom> à l'onboarding,
+# cf. exploitation.md) : un chart tenant ne doit jamais pouvoir créer de
+# ClusterRole/CRD/etc — c'est la définition même de l'isolation multi-tenant.
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -15,4 +15,6 @@ spec:
   destinations:
     - server: https://kubernetes.default.svc
       namespace: "cust-*"
-  clusterResourceWhitelist: []
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace

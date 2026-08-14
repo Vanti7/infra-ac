@@ -20,6 +20,17 @@ spec:
         prometheus:
           prometheusSpec:
             retention: 10d
+            # I7 (audit) : sans storageSpec, Prometheus tourne en emptyDir —
+            # la retention 10d est fictive, tout est perdu au moindre restart
+            # de pod.
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 10Gi
             resources:
               requests:
                 cpu: 200m
@@ -39,16 +50,46 @@ spec:
 
         alertmanager:
           alertmanagerSpec:
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 1Gi
             resources:
               requests:
                 cpu: 50m
                 memory: 64Mi
               limits:
                 memory: 256Mi
+          # I7 (audit) : aucune route de notification jusqu'ici — rien ne
+          # préviendrait de C2 (panne disque/backup). ntfy.sh : topic public
+          # mais non-devinable, zéro identifiant à gérer/chiffrer. Le repo
+          # est privé (C1) donc ce topic n'est pas exposé publiquement.
+          config:
+            route:
+              receiver: ntfy
+              group_by: ["alertname"]
+              group_wait: 30s
+              group_interval: 5m
+              repeat_interval: 4h
+            receivers:
+              - name: ntfy
+                webhook_configs:
+                  - url: https://ntfy.sh/aetheriscloud-alerts-7e9d1f49912a95b5
+                    send_resolved: true
 
         grafana:
           admin:
             existingSecret: grafana-admin-secret
+          # I7 : persistence désactivée par défaut sur ce chart — dashboards
+          # perso et config perdus au moindre redémarrage de pod.
+          persistence:
+            enabled: true
+            storageClassName: local-path
+            size: 1Gi
           resources:
             requests:
               cpu: 50m

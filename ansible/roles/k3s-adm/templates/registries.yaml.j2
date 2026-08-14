@@ -13,3 +13,13 @@ configs:
     auth:
       username: "{{ ghcr_pull_username }}"
       password: "{{ ghcr_pull_token }}"
+  # I11 (audit) : Harbor repasse en projet privé, containerd a donc besoin
+  # d'un credential pour pull. Robot account dédié, pull-only, scope projet
+  # aetheriscloud — même principe de moindre privilège que ghcr_pull_token.
+  # Pas de bloc "mirrors"/insecure_skip_verify ici : Harbor sert un vrai cert
+  # Let's Encrypt via Traefik depuis la Phase 6.2, la résolution DNS normale
+  # de harbor.aetheriscloud.fr suffit.
+  "harbor.aetheriscloud.fr":
+    auth:
+      username: "{{ harbor_pull_username }}"
+      password: "{{ harbor_pull_token }}"

@@ -128,3 +128,9 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      # Pitfall documenté (workflow §5.4) : les CRD Prometheus dépassent
+      # 262144 octets, la limite de l'annotation last-applied-configuration
+      # en client-side apply — chaque sync échouait en boucle dès qu'une
+      # CRD changeait de version/taille (ex: après ce commit-ci).
+      - ServerSideApply=true

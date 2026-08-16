@@ -15,10 +15,18 @@ spec:
     - from:
         - podSelector: {}
       # Admission webhooks (cert-manager-webhook) appelés directement par
-      # kube-apiserver, qui tourne hostNetwork sur k3s-adm — pas un pod, donc
-      # ipBlock et non namespaceSelector.
+      # kube-apiserver (hostNetwork sur k3s-adm, pas un pod → pas de
+      # podSelector/namespaceSelector possible). PAS ipBlock 10.42.0.11/32
+      # (l'IP de management du nœud) : pour du trafic ORIGINAIRE D'UN
+      # PROCESSUS HÔTE (pas un pod) vers une IP pod, le noyau route via
+      # flannel.1 et l'IP source vue par le nœud destinataire devient celle
+      # de CETTE interface (10.44.0.0 pour k3s-adm), pas l'IP de management
+      # — confirmé par capture tcpdump en direct + compteurs iptables
+      # avant/après (0 hit sur la règle 10.42.0.11/32, healthz agissait
+      # comme si aucune règle n'existait). D'où l'allow sur tout le pod CIDR
+      # plutôt qu'une IP précise et fragile.
         - ipBlock:
-            cidr: 10.42.0.11/32
+            cidr: 10.44.0.0/16
   egress:
     - to:
         - namespaceSelector:

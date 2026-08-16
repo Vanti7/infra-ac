@@ -158,13 +158,13 @@ Sévérité : **C** = critique (bloque la reconstruction ou expose l'infra), **I
 
 | ID | Écart | Remédiation |
 |---|---|---|
-| **M14** | **Aucune probe** `liveness`/`readiness` sur aucun déploiement maison. Le portail expose `/healthz` qui n'est utilisé nulle part. | Ajouter les probes ; rolling update aveugle sinon. |
+| **M14** ✅ | **Aucune probe** `liveness`/`readiness` sur aucun déploiement maison. Le portail expose `/healthz` qui n'est utilisé nulle part. | Ajouter les probes ; rolling update aveugle sinon. **Fait le 2026-08-16** : portal (`/healthz`), docs-internal/docs-public (`GET /`). |
 | **M15** ✅ | **`whoami` de test toujours en production** et publiquement joignable ; il renvoie tous les headers et l'IP du pod. | Supprimer `platform/traefik/whoami-test.yaml` après validation. **Fait le 2026-08-16** : supprimé, namespace `aetheris-apps` pruné avec, vérifié 404. |
 | **M16** | **Portail — `python-jose==3.3.0`** : CVE-2024-33663 (confusion d'algorithme), CVE-2024-33664 (DoS). Flow OIDC sans `nonce` ni PKCE. Groupes figés dans la session : révoquer un groupe Keycloak reste sans effet jusqu'à expiration (14 j par défaut de `SessionMiddleware`). | `authlib` ou `pyjwt` ≥ à jour ; ajouter `nonce` + PKCE ; `max_age` de session court + rafraîchissement des claims. |
 | **M17** | **Builds non reproductibles** : pas de lockfile npm committé (`npm install`, pas `npm ci`), images de base flottantes, 3 images maison buildées à la main via podman sur `k3s-w1`. Aucun scan avant push. | Pipeline de build (GitHub Actions ou Gitea Actions) + `npm ci` + digests épinglés + scan Trivy. |
 | **M18** | **Gitea n'a plus de rôle clair** depuis que Harbor a repris le registre, et il est derrière Teleport `app_service` → `git clone`/`push` en CLI impossibles (session navigateur requise). C'est un Postgres + un pod de plus à sauvegarder. | Décision à trancher (§4.0) : lui donner un accès CLI réel, ou le retirer. |
 | **M19** ✅ | `bootstrap/values.yaml` : `global.domain: localhost:8080` résiduel, incohérent avec `configs.cm.url`. ArgoCD étant hors GitOps, ce fichier peut avoir divergé du cluster réel. | Corrigé de fait par `C3` (ArgoCD self-managed). **Fait le 2026-08-16** : ArgoCD toujours pas self-managed (I9 partiel), donc corrigé à la main — `global.domain` → `argocd.ops.aetheriscloud.fr`, appliqué via `helm upgrade`. |
-| **M20** | **Pas de README à la racine**, pas de LICENSE. Un repo d'infra sans point d'entrée. | `README.md` : architecture en 10 lignes, prérequis, ordre de déploiement, variables requises. |
+| **M20** ✅ | **Pas de README à la racine**, pas de LICENSE. Un repo d'infra sans point d'entrée. | `README.md` : architecture en 10 lignes, prérequis, ordre de déploiement, variables requises. **Fait le 2026-08-16** : `README.md` + `LICENSE` (propriétaire — repo privé d'une activité commerciale, pas de licence open source). |
 
 ---
 
@@ -337,10 +337,10 @@ et attends mon arbitrage avant d'écrire quoi que ce soit.
 | I11 | Important | Harbor public et exposé publiquement | ✅ fait 2026-08-14 |
 | I12 | Important | Ansible non rejouable (4 variables non documentées) | ✅ fait 2026-08-16 |
 | I13 | Important | Hôte PVE 100 % manuel | 1 |
-| M14 | Mineur | Aucune probe | 4 |
+| M14 | Mineur | Aucune probe | ✅ fait 2026-08-16 |
 | M15 | Mineur | `whoami` de test en production | ✅ fait 2026-08-16 |
 | M16 | Mineur | `python-jose` vulnérable, OIDC sans nonce/PKCE | 4 |
 | M17 | Mineur | Builds non reproductibles | 5 |
 | M18 | Mineur | Gitea sans rôle clair, inutilisable en CLI | 4.0 |
 | M19 | Mineur | `bootstrap/values.yaml` résiduel | ✅ fait 2026-08-16 |
-| M20 | Mineur | Pas de README ni LICENSE | 5 |
+| M20 | Mineur | Pas de README ni LICENSE | ✅ fait 2026-08-16 |

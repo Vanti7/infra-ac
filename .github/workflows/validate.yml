@@ -44,13 +44,18 @@ jobs:
             | tar -xz -C /usr/local/bin kubeconform
       - name: Installer helm
         uses: azure/setup-helm@v4
-      - name: Manifestes bruts (hors chart tenant, values.yaml, kustomization.yaml)
+      - name: Manifestes bruts (hors chart tenant, values.yaml, kustomization.yaml, secrets chiffrés)
         run: |
+          # *.enc.yaml exclus : la clé `sops:` (métadonnées de chiffrement)
+          # n'est pas une propriété valide du schéma Secret standard — c'est
+          # attendu, pas une erreur (le contenu utile est chiffré de toute
+          # façon, rien à valider structurellement avant déchiffrement par ksops).
           find kubernetes -name "*.yaml" \
             -not -path "*/onboarding-client/*" \
             -not -name "kustomization.yaml" \
             -not -name "values.yaml" \
             -not -name "*.values.yaml" \
+            -not -name "*.enc.yaml" \
             -print0 \
           | xargs -0 kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.36.0
       - name: Chart tenant onboarding-client (rendu Helm)
@@ -78,7 +83,7 @@ jobs:
       - name: Installer sops
         run: |
           curl -sSL -o /usr/local/bin/sops \
-            https://github.com/getsops/sops/releases/latest/download/sops-linux-amd64
+            https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.amd64
           chmod +x /usr/local/bin/sops
       # La clé age de CI valide que le déchiffrement marche réellement (pas
       # juste que le fichier est un YAML bien formé) — si cette étape échoue,

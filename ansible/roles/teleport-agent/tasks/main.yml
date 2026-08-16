@@ -38,6 +38,7 @@
   register: teleport_token_result
   changed_when: false
   when: not teleport_joined.stat.exists
+  no_log: true
   # Pas de secret statique à documenter/stocker : contrairement à k3s_token
   # (pré-partagé, doit être identique des deux côtés), un join token Teleport
   # n'est utile qu'une fois, à la création du nœud — le générer ici évite
@@ -47,6 +48,7 @@
   set_fact:
     teleport_join_token: "{{ (teleport_token_result.stdout | from_json).token }}"
   when: not teleport_joined.stat.exists
+  no_log: true
 
 - name: Déployer /etc/teleport.yaml (join token, seulement au premier join)
   template:
@@ -55,6 +57,7 @@
     mode: "0644"
   when: not teleport_joined.stat.exists
   notify: redémarrer teleport-agent
+  no_log: true
 
 - name: Démarrer et activer Teleport
   systemd:

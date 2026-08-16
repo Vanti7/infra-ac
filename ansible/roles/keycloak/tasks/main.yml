@@ -20,6 +20,7 @@
     password: "{{ keycloak_db_password }}"
   become: true
   become_user: postgres
+  no_log: true
 
 - name: Créer la base keycloak
   community.postgresql.postgresql_db:
@@ -103,6 +104,7 @@
   environment:
     KC_BOOTSTRAP_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
   when: not kc_admin_done.stat.exists
+  no_log: true
 
 - name: Marquer l'admin comme bootstrappé
   file:
@@ -172,6 +174,7 @@
   environment:
     GANDIV5_PERSONAL_ACCESS_TOKEN: "{{ gandi_api_token }}"
   when: not cert_exists.stat.exists
+  no_log: true
 
 - name: Déployer le script de renouvellement lego
   template:

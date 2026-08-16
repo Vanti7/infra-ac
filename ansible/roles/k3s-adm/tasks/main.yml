@@ -15,6 +15,8 @@
     dest: /etc/rancher/k3s/config.yaml
     mode: "0600"
   notify: redémarrer k3s
+  # no_log : k3s_token en clair dans le rendu, visible dans un diff --diff sinon
+  no_log: true
 
 - name: Déployer /etc/rancher/k3s/registries.yaml (registre Gitea en plain HTTP)
   template:
@@ -22,6 +24,8 @@
     dest: /etc/rancher/k3s/registries.yaml
     mode: "0644"
   notify: redémarrer k3s
+  # no_log : ghcr_pull_token/harbor_pull_token en clair dans le rendu
+  no_log: true
 
 - name: Télécharger le script d'installation k3s
   get_url:

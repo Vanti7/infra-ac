@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: docs-internal
-          image: harbor.aetheriscloud.fr/aetheriscloud/docs-internal:1.0.4
+          image: harbor.aetheriscloud.fr/aetheriscloud/docs-internal:1.0.5
           ports:
             - containerPort: 8080
           securityContext:

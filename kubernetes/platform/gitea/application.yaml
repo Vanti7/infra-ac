@@ -95,3 +95,11 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      # gitea-ssh était headless (clusterIP: None) avant M18 : le 3-way merge
+      # côté client d'ArgoCD (last-applied-configuration) rejetait le
+      # passage à NodePort même après suppression manuelle de l'objet
+      # ("may not be set to 'None' for NodePort services", en boucle).
+      # Server-side apply n'a pas ce problème (pas de diff contre un état
+      # en cache, juste le champ tel que rendu maintenant).
+      - ServerSideApply=true

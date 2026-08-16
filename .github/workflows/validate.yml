@@ -1,0 +1,89 @@
+name: Validate
+
+# M17 (audit) : CI bloquante sur PR. Aujourd'hui prune:true + selfHeal:true +
+# directory.recurse:true sur l'app platform sans aucune validation en amont —
+# un push malheureux est appliqué en secondes, suppression comprise (I9).
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
+
+  ansible-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ansible ansible-lint
+      - run: ansible-galaxy collection install -r ansible/requirements.yml
+      - run: ansible-lint
+        working-directory: ansible
+
+  kubeconform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar -xz -C /usr/local/bin kubeconform
+      - name: Installer helm
+        uses: azure/setup-helm@v4
+      - name: Manifestes bruts (hors chart tenant, values.yaml, kustomization.yaml)
+        run: |
+          find kubernetes -name "*.yaml" \
+            -not -path "*/onboarding-client/*" \
+            -not -name "kustomization.yaml" \
+            -not -name "values.yaml" \
+            -not -name "*.values.yaml" \
+            -print0 \
+          | xargs -0 kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.36.0
+      - name: Chart tenant onboarding-client (rendu Helm)
+        run: |
+          helm template test-tenant kubernetes/tenants/onboarding-client --set name=ci-test \
+            | kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.36.0
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.30.1_linux_x64.tar.gz \
+            | tar -xz -C /usr/local/bin gitleaks
+      # --no-git : un checkout CI ne contient que ce qui est suivi par git
+      # (secrets/ est gitignored, jamais présent ici) — équivalent à scanner
+      # exactement ce qui serait mergé.
+      - run: gitleaks detect --no-git -v
+
+  sops-decrypt-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer sops
+        run: |
+          curl -sSL -o /usr/local/bin/sops \
+            https://github.com/getsops/sops/releases/latest/download/sops-linux-amd64
+          chmod +x /usr/local/bin/sops
+      # La clé age de CI valide que le déchiffrement marche réellement (pas
+      # juste que le fichier est un YAML bien formé) — si cette étape échoue,
+      # un secret vient d'être committé avec la mauvaise clé destinataire.
+      - name: Déchiffrer un secret de test
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: sops --config /dev/null -d kubernetes/secrets/zabbix-db-secret.enc.yaml > /dev/null

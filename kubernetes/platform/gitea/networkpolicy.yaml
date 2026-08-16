@@ -23,7 +23,13 @@ spec:
         - ipBlock: {cidr: 10.42.0.0/24}
         - ipBlock: {cidr: 10.99.0.0/24}
       ports:
-        - {protocol: TCP, port: 22}
+        # NetworkPolicy filtre le port réel du conteneur (après le DNAT
+        # NodePort→targetPort), pas le port du Service. gitea-ssh mappe
+        # 22->2222 (targetPort ≠ port) — mettre 22 ici ne matche jamais le
+        # paquet réellement filtré, REJECT en boucle malgré la bonne
+        # source. gitea-http mappe 3000->3000 (identique), d'où l'écart
+        # invisible tant que seul le HTTP est testé.
+        - {protocol: TCP, port: 2222}
         - {protocol: TCP, port: 3000}
   egress:
     - to:

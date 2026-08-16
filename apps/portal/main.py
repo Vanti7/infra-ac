@@ -1,11 +1,13 @@
+import base64
+import hashlib
 import os
 import secrets
 import time
 
 import httpx
+import jwt
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from jose import jwt
 from starlette.middleware.sessions import SessionMiddleware
 
 OIDC_ISSUER = os.environ["OIDC_ISSUER"]
@@ -30,8 +32,22 @@ TOOLS = [
     {"name": "Teleport", "description": "Accès SSH / Kubernetes (tsh)", "url": "https://teleport.aetheriscloud.fr", "group": None},
 ]
 
+# M16 (audit) : session à durée de vie courte. Les groupes Keycloak sont
+# figés dans la session au login (cf. callback) — révoquer un groupe reste
+# sans effet tant que la session n'expire pas. 14j par défaut (Starlette)
+# -> 1h : un accès révoqué se referme vite sans avoir à rafraîchir les
+# claims en tâche de fond (complexité pas justifiée pour un simple portail
+# de liens).
+SESSION_MAX_AGE = 3600
+
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET, same_site="lax", https_only=True)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SESSION_SECRET,
+    same_site="lax",
+    https_only=True,
+    max_age=SESSION_MAX_AGE,
+)
 
 _oidc_config_cache = {"data": None, "fetched_at": 0}
 
@@ -46,12 +62,22 @@ async def oidc_config():
     return _oidc_config_cache["data"]
 
 
-async def jwks():
+_jwks_client_cache = {"client": None, "jwks_uri": None}
+
+
+async def jwks_client():
     config = await oidc_config()
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(config["jwks_uri"])
-        resp.raise_for_status()
-        return resp.json()
+    jwks_uri = config["jwks_uri"]
+    if _jwks_client_cache["jwks_uri"] != jwks_uri:
+        _jwks_client_cache["client"] = jwt.PyJWKClient(jwks_uri)
+        _jwks_client_cache["jwks_uri"] = jwks_uri
+    return _jwks_client_cache["client"]
+
+
+def pkce_pair():
+    verifier = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    return verifier, challenge
 
 
 def page(body: str) -> HTMLResponse:
@@ -105,13 +131,20 @@ async def index(request: Request):
 async def login(request: Request):
     config = await oidc_config()
     state = secrets.token_urlsafe(24)
+    nonce = secrets.token_urlsafe(24)
+    verifier, challenge = pkce_pair()
     request.session["oidc_state"] = state
+    request.session["oidc_nonce"] = nonce
+    request.session["oidc_verifier"] = verifier
     params = httpx.QueryParams({
         "client_id": OIDC_CLIENT_ID,
         "response_type": "code",
         "scope": "openid profile email",
         "redirect_uri": REDIRECT_URI,
         "state": state,
+        "nonce": nonce,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
     })
     return RedirectResponse(f"{config['authorization_endpoint']}?{params}")
 
@@ -123,6 +156,7 @@ async def callback(request: Request):
     if not code or not state or state != request.session.get("oidc_state"):
         return RedirectResponse("/")
 
+    verifier = request.session.get("oidc_verifier")
     config = await oidc_config()
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(config["token_endpoint"], data={
@@ -131,25 +165,31 @@ async def callback(request: Request):
             "redirect_uri": REDIRECT_URI,
             "client_id": OIDC_CLIENT_ID,
             "client_secret": OIDC_CLIENT_SECRET,
+            "code_verifier": verifier,
         })
         token_resp.raise_for_status()
         tokens = token_resp.json()
 
-    keys = await jwks()
+    client = await jwks_client()
+    signing_key = client.get_signing_key_from_jwt(tokens["id_token"])
     claims = jwt.decode(
         tokens["id_token"],
-        keys,
+        signing_key.key,
         algorithms=["RS256"],
         audience=OIDC_CLIENT_ID,
         issuer=OIDC_ISSUER,
     )
+
+    if claims.get("nonce") != request.session.get("oidc_nonce"):
+        return RedirectResponse("/")
 
     request.session["user"] = {
         "sub": claims["sub"],
         "preferred_username": claims.get("preferred_username"),
         "groups": claims.get("groups", []),
     }
-    request.session.pop("oidc_state", None)
+    for k in ("oidc_state", "oidc_nonce", "oidc_verifier"):
+        request.session.pop(k, None)
     return RedirectResponse("/")
 
 

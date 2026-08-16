@@ -49,6 +49,20 @@ spec:
               memory: 64Mi
             limits:
               memory: 128Mi
+          # M14 (audit) : /healthz existait déjà (apps/portal/main.py) mais
+          # n'était utilisé nulle part — rolling update aveugle sans ça.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service

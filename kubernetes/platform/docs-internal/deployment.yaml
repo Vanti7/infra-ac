@@ -32,6 +32,19 @@ spec:
               memory: 32Mi
             limits:
               memory: 64Mi
+          # M14 (audit) : aucune probe nulle part, rolling update aveugle sinon.
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service

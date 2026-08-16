@@ -28,7 +28,15 @@ spec:
     - to:
         - ipBlock: {cidr: 10.43.0.0/16}
     - to:
-        - ipBlock: {cidr: 10.42.0.5/32}
+        # PAS 10.42.0.5 (IP interne Teleport) : rejette toute connexion
+        # directe (même famille de problème que Keycloak/10.42.0.6 — PROXY
+        # protocol requis, fourni par HAProxy uniquement). Le tunnel inversé
+        # se connecte réellement via le hairpin par l'IP publique (résolution
+        # DNS normale de teleport.aetheriscloud.fr). Découvert en cassant la
+        # connectivité en direct (redémarrage du pod pour ajouter l'app
+        # zabbix) : la connexion établie AVANT ce netpol survivait, seul un
+        # redémarrage révèle le blocage — même symptôme que netbox-worker.
+        - ipBlock: {cidr: 51.15.191.67/32}
       ports:
         - {protocol: TCP, port: 443}
     - to:

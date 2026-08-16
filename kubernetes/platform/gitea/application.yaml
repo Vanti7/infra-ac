@@ -28,6 +28,13 @@ spec:
           http:
             type: NodePort
             nodePort: 30300
+          # M18 (audit) : Gitea derrière Teleport = pas de git clone/push en
+          # CLI (session navigateur requise). NodePort SSH, jamais public —
+          # seulement joignable depuis 10.42.0.0/24 / 10.99.0.0/24 (netpol
+          # dédiée). L'accès web via Teleport reste inchangé.
+          ssh:
+            type: NodePort
+            nodePort: 30022
 
         postgresql-ha:
           enabled: false
@@ -45,6 +52,14 @@ spec:
             server:
               DOMAIN: gitea.ops.aetheriscloud.fr
               ROOT_URL: https://gitea.ops.aetheriscloud.fr/
+              # M18 : clone/push CLI en SSH, indépendant de ROOT_URL (web,
+              # via Teleport). IP d'un nœud k3s plutôt qu'un nom : accès
+              # WireGuard uniquement, pas de DNS interne pour ça (cf.
+              # ansible/roles/dns-interne, qui ne couvre que les hôtes gérés
+              # par Ansible, pas le poste admin).
+              START_SSH_SERVER: true
+              SSH_DOMAIN: 10.42.0.21
+              SSH_PORT: 30022
             database:
               DB_TYPE: postgres
               HOST: "gitea-postgresql:5432"

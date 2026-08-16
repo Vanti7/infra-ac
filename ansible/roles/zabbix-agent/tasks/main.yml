@@ -7,12 +7,10 @@
 - name: Installer le dépôt Zabbix
   ansible.builtin.apt:
     deb: /tmp/zabbix-release.deb
-  register: zabbix_repo_installed
+  notify: rafraîchir le cache apt (zabbix)
 
-- name: Rafraîchir le cache apt après ajout du dépôt
-  ansible.builtin.apt:
-    update_cache: true
-  when: zabbix_repo_installed.changed
+- name: Forcer le rafraîchissement du cache apt avant d'installer zabbix-agent2
+  ansible.builtin.meta: flush_handlers
 
 - name: Installer zabbix-agent2
   ansible.builtin.apt:

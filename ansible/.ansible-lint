@@ -1,0 +1,25 @@
+# M17 (audit) : CI bloquante sur PR. Les règles ci-dessous sont volontairement
+# désactivées — toutes de pure forme, aucune ne signale un vrai risque
+# (contrairement à risky-file-permissions/no-changed-when/no-handler, corrigées
+# plutôt que masquées) :
+#   - fqcn : `apt:` vs `ansible.builtin.apt:` — verbeux, aucune ambiguïté réelle
+#     sur des modules builtin dans ce repo (pas de collection tierce qui
+#     redéfinit apt/copy/template/etc.)
+#   - var-naming[no-role-prefix] : renommer des variables déjà en prod
+#     (acme_email, sso_domain...) pour une convention de préfixe, risque de
+#     casse pour un gain nul
+#   - role-name : impose des underscores (k3s_adm) au lieu des tirets
+#     (k3s-adm) déjà utilisés partout — renommer les dossiers de rôles
+#     casserait site.yml sans aucun bénéfice
+#   - name[casing] : majuscule en début de nom de tâche — cosmétique
+#   - yaml[line-length] : quelques lignes > 160 caractères (URLs, commandes
+#     lego/kc.sh) — les couper nuirait à la lisibilité
+skip_list:
+  - fqcn[action-core]
+  - var-naming[no-role-prefix]
+  - role-name
+  - name[casing]
+  - yaml[line-length]
+
+exclude_paths:
+  - .venv/

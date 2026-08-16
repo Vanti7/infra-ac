@@ -80,6 +80,7 @@
   become: true
   become_user: keycloak
   when: not kc_build_done.stat.exists
+  changed_when: true
 
 - name: Marquer le build comme fait
   file:
@@ -87,6 +88,7 @@
     state: touch
     owner: keycloak
     group: keycloak
+    mode: "0644"
   when: not kc_build_done.stat.exists
 
 - name: Marqueur d'admin bootstrap
@@ -105,6 +107,7 @@
     KC_BOOTSTRAP_ADMIN_PASSWORD: "{{ keycloak_admin_password }}"
   when: not kc_admin_done.stat.exists
   no_log: true
+  changed_when: true
 
 - name: Marquer l'admin comme bootstrappé
   file:
@@ -112,6 +115,7 @@
     state: touch
     owner: keycloak
     group: keycloak
+    mode: "0644"
   when: not kc_admin_done.stat.exists
 
 - name: Déployer l'unité systemd Keycloak
@@ -175,6 +179,7 @@
     GANDIV5_PERSONAL_ACCESS_TOKEN: "{{ gandi_api_token }}"
   when: not cert_exists.stat.exists
   no_log: true
+  changed_when: true
 
 - name: Déployer le script de renouvellement lego
   template:
@@ -185,6 +190,7 @@
 - name: Déployer le service systemd de renouvellement
   copy:
     dest: /etc/systemd/system/lego-renew.service
+    mode: "0644"
     content: |
       [Unit]
       Description=Renouvellement certificat lego
@@ -197,6 +203,7 @@
 - name: Déployer le timer systemd de renouvellement
   copy:
     dest: /etc/systemd/system/lego-renew.timer
+    mode: "0644"
     content: |
       [Unit]
       Description=Renouvellement quotidien du certificat lego
@@ -215,6 +222,7 @@
   template:
     src: nginx-keycloak.conf.j2
     dest: /etc/nginx/sites-available/keycloak.conf
+    mode: "0644"
   notify: recharger nginx
 
 - name: Activer le site nginx keycloak

@@ -19,6 +19,7 @@
 - name: Ajouter le dépôt apt Teleport
   copy:
     dest: /etc/apt/sources.list.d/teleport.list
+    mode: "0644"
     content: "deb [signed-by=/usr/share/keyrings/teleport-archive-keyring.asc] https://apt.releases.teleport.dev/debian {{ teleport_apt_codename }} stable/v18\n"
 
 - name: Installer Teleport

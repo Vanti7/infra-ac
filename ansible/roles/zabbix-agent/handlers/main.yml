@@ -2,3 +2,7 @@
   ansible.builtin.systemd:
     name: zabbix-agent2
     state: restarted
+
+- name: rafraîchir le cache apt (zabbix)
+  ansible.builtin.apt:
+    update_cache: true

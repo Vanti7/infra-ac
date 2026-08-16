@@ -454,8 +454,9 @@ référence OIDC
 
 **Dette encore ouverte** (voir aussi `disaster-recovery.md` §4) : vendoriser le patch
 `gandiclient.go` plutôt que de le laisser en prose dans un README ; C2 (RAID/backups)
-toujours bloqué sur le NAS maison ; lots I6-I13/M14-M20 de l'audit non traités
-(NetworkPolicy plateforme, Harbor public, probes, `whoami` de test, CI, README racine).
+toujours bloqué sur le NAS maison ; lots I10/I12/I13/M14-M20 de l'audit non traités
+(local-path/PV épinglés, variables Ansible non documentées, hôte PVE 100% manuel,
+probes, `whoami` de test, CI, README racine).
 
 > **Correction ultérieure (2026-08-11)** : `<nom>.teleport.aetheriscloud.fr` (§Phase 6,
 > ci-dessus, et `docs-internal` ci-dessous) renommé en `<nom>.ops.aetheriscloud.fr` —
@@ -464,6 +465,46 @@ toujours bloqué sur le NAS maison ; lots I6-I13/M14-M20 de l'audit non traités
 > DNS, règle SNI HAProxy, `public_addr` Teleport et `redirectUris`/`webOrigins`
 > Keycloak des 3 clients OIDC concernés mis à jour en conséquence. Détail dans
 > `disaster-recovery.md`.
+
+> **Suite de la remédiation (2026-08-11 → 2026-08-16)** : I6 (NetworkPolicy default-deny
+> par namespace plateforme), I8 (netpol tenant → monitoring), I9 (`AppProject`
+> `platform`/`tenants` restreints), I7 (`storageSpec` Prometheus + persistance Grafana +
+> route Alertmanager vers ntfy.sh) et I11 (Harbor reprivatisé, robot account pull-only)
+> traités. Plusieurs bugs réels trouvés et corrigés en cours de route, tous documentés
+> dans `audit-infra-ac.md` §3 :
+> - Egress netpol vers une IP interne qui reset toute connexion directe (Keycloak
+>   10.42.0.6, Teleport 10.42.0.5 — PROXY protocol requis, HAProxy seul le fournit) —
+>   corrigé vers le hairpin par IP publique. Le cas Teleport a momentanément cassé
+>   l'accès à *tous* les app_service proxifiés (argocd/grafana/gitea/docs-internal),
+>   pas seulement l'app concernée par le changement qui a déclenché le redémarrage.
+> - Egress netpol vers le ClusterIP `10.43.0.1` (service `kubernetes`) : sous
+>   kube-router, le DNAT vers l'IP réelle (`10.42.0.11:6443`) a lieu avant
+>   l'évaluation du netpol — une règle sur le ClusterIP ne matche jamais. A fait
+>   planter `netbox-worker` en boucle pendant 14h avant détection (régression
+>   invisible tant qu'aucun rollout ne survient sur le pod déjà en place).
+> - Root cause plus profonde du même symptôme : pour du trafic ORIGINAIRE D'UN
+>   PROCESSUS HÔTE (apiserver, pas un pod) vers une IP pod sur un autre nœud, le
+>   noyau route via `flannel.1` et l'IP source vue par le nœud destinataire devient
+>   celle de cette interface (`10.44.0.0` pour k3s-adm), pas l'IP de management —
+>   cassait l'admission webhook cert-manager. Confirmé par capture tcpdump en
+>   direct + compteurs iptables avant/après (le ping passait quand même car les CNI
+>   n'appliquent en général pas les NetworkPolicy à l'ICMP, ce qui a fait
+>   soupçonner à tort un problème matériel MTU/checksum offload VXLAN).
+> - Whitelists `clusterResourceWhitelist` d'I9 trop strictes découvertes une par une
+>   au fil des syncs qui échouaient en boucle (`IngressClass` pour Traefik,
+>   `ClusterIssuer` pour cert-manager, `Namespace` manquant sur le projet `tenants` —
+>   invisible tant qu'aucun nouveau client n'est onboardé).
+> - Restreindre le projet `default` pendant que l'app `platform` (app-of-apps) y
+>   était encore assignée l'a rendue `InvalidSpec`, bloquant toute la cascade GitOps
+>   ~20 min (aucun impact utilisateur, corrigé par un patch direct autorisé).
+>
+> **Ajout hors-audit : Zabbix.** Déployé dans k3s (comme le reste — pas de CT dédié,
+> même tradeoff que Prometheus : suit le cluster si k3s tombe) pour superviser ce que
+> Prometheus ne couvre pas nativement : l'hôte PVE, les CT teleport/iam, et à terme le
+> NAS maison. Checks actifs uniquement (NodePort trapper 10051, jamais public),
+> auto-registration côté serveur, rôle Ansible `zabbix-agent` sur les 6 hôtes/CT
+> existants, SSO SAML Keycloak (JIT provisioning). Mot de passe Admin par défaut pas
+> encore changé (reporté). Détail dans `exploitation.md`.
 
 ---
 

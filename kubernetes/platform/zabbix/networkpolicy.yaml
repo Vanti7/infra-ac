@@ -1,0 +1,40 @@
+# I6 (audit, même discipline appliquée à ce nouvel ajout) : default-deny +
+# allow explicites. Zabbix web via Teleport ; port trapper (10051) ouvert
+# uniquement au réseau interne/WG pour les agents actifs hors cluster
+# (hôte PVE, CT teleport/iam, futur NAS) — jamais public.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zabbix-default
+  namespace: zabbix
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: teleport-agent
+    - from:
+        - ipBlock: {cidr: 10.42.0.0/24}
+        - ipBlock: {cidr: 10.99.0.0/24}
+      ports:
+        - {protocol: TCP, port: 10051}
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+    - to:
+        - podSelector: {}
+    - to:
+        # PAS 10.42.0.6 (IP interne Keycloak) : reset direct, cf. commentaire
+        # identique sur les autres netpol plateforme (PROXY protocol requis).
+        # Hairpin par l'IP publique — utile pour le SSO SAML.
+        - ipBlock: {cidr: 51.15.191.67/32}
+      ports:
+        - {protocol: TCP, port: 443}

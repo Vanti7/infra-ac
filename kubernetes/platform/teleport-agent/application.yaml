@@ -37,6 +37,9 @@ spec:
           - name: docs-internal
             uri: http://docs-internal.docs-internal.svc.cluster.local:80
             public_addr: docs-internal.ops.aetheriscloud.fr
+          - name: zabbix
+            uri: http://zabbix-zabbix-web.zabbix.svc.cluster.local:80
+            public_addr: zabbix.ops.aetheriscloud.fr
         updater:
           enabled: true
   destination:

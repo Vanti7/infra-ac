@@ -21,6 +21,7 @@ spec:
     - https://charts.netbox.oss.netboxlabs.com/
     - https://charts.releases.teleport.dev
     - https://traefik.github.io/charts
+    - https://zabbix-community.github.io/helm-zabbix
   # L'app `secrets` (ksops) ne fixe pas de destination.namespace unique — ses
   # ressources visent 7 namespaces différents (chaque Secret porte son propre
   # metadata.namespace). Un wildcard ici ne change rien à CE qui est déployé

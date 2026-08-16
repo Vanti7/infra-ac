@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zabbix
+  namespace: argocd
+spec:
+  project: platform
+  source:
+    repoURL: https://zabbix-community.github.io/helm-zabbix
+    chart: zabbix
+    targetRevision: 7.1.0
+    helm:
+      values: |
+        # Zabbix supervise l'infra HORS cluster (hôte PVE, CT teleport/iam,
+        # et le futur NAS) — le monitoring DEDANS le cluster est déjà couvert
+        # par kube-prometheus-stack (I7). Pas besoin du sidecar zabbix-agent
+        # sur les pods zabbix eux-mêmes.
+        zabbixAgent:
+          enabled: false
+
+        # Credentials DB : secret dédié chiffré ksops (kubernetes/secrets/),
+        # jamais en clair ici. Postgres bundlé par le chart (postgresql.enabled
+        # par défaut), mêmes credentials.
+        postgresAccess:
+          existingSecretName: zabbix-db-secret
+
+        postgresql:
+          persistence:
+            enabled: true
+            storageSize: 5Gi
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+
+        zabbixServer:
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          # Port trapper (10051) en NodePort : les agents actifs sur l'hôte
+          # PVE/CT teleport/CT iam/nœuds k3s (hors cluster ou hors service
+          # mesh) poussent leurs données ici. Jamais public — seulement
+          # joignable depuis 10.42.0.0/24 / 10.99.0.0/24 (netpol dédiée),
+          # même logique que le NodePort SSH de Gitea (M18).
+          service:
+            type: NodePort
+            nodePort: 31051
+
+        zabbixWeb:
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zabbix
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Mêmes CRD volumineuses potentielles que monitoring (I7) — évite de
+      # revivre le blocage "262144 bytes" en client-side apply.
+      - ServerSideApply=true

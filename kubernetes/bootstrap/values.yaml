@@ -1,5 +1,5 @@
 global:
-  domain: localhost:8080
+  domain: argocd.ops.aetheriscloud.fr
 
 configs:
   params:

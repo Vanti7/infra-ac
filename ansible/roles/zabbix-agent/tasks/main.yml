@@ -1,0 +1,33 @@
+- name: "Télécharger le paquet zabbix-release (dépôt officiel, Debian {{ ansible_distribution_major_version }})"
+  ansible.builtin.get_url:
+    url: "https://repo.zabbix.com/zabbix/7.0/debian/pool/main/z/zabbix-release/zabbix-release_latest_7.0+debian{{ ansible_distribution_major_version }}_all.deb"
+    dest: /tmp/zabbix-release.deb
+    mode: "0644"
+
+- name: Installer le dépôt Zabbix
+  ansible.builtin.apt:
+    deb: /tmp/zabbix-release.deb
+  register: zabbix_repo_installed
+
+- name: Rafraîchir le cache apt après ajout du dépôt
+  ansible.builtin.apt:
+    update_cache: true
+  when: zabbix_repo_installed.changed
+
+- name: Installer zabbix-agent2
+  ansible.builtin.apt:
+    name: zabbix-agent2
+    state: present
+
+- name: Déployer /etc/zabbix/zabbix_agent2.conf
+  ansible.builtin.template:
+    src: zabbix_agent2.conf.j2
+    dest: /etc/zabbix/zabbix_agent2.conf
+    mode: "0644"
+  notify: redémarrer zabbix-agent2
+
+- name: Démarrer et activer zabbix-agent2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    enabled: true
+    state: started

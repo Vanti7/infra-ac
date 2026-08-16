@@ -1,0 +1,15 @@
+# L'hôte PVE lui-même n'est pas provisionné par Terraform (c'est l'hyperviseur
+# physique, pas une VM/LXC Proxmox) — il ne peut donc pas apparaître dans
+# l'inventaire généré depuis local.netbox_hosts (cf. terraform.yml). Fichier
+# statique séparé, fusionné avec terraform.yml (ansible.cfg pointe sur le
+# dossier inventory/ entier, pas un fichier unique).
+#
+# Étape préparatoire pour I13 (rôles Ansible hôte PVE, pas encore écrits) :
+# permet dès maintenant de cibler stargate-px1 pour des rôles ponctuels
+# (zabbix-agent) sans attendre la remédiation complète.
+"pve_host":
+  "hosts":
+    "stargate-px1":
+      "ansible_host": "10.42.0.1"
+      "ansible_user": "root"
+      "ansible_ssh_private_key_file": "../secrets/ssh/dedibox_root"

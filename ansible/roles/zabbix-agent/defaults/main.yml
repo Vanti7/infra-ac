@@ -1,0 +1,4 @@
+# Les 3 nœuds k3s exposent le port trapper (10051, NodePort) de façon
+# identique — n'importe lequel répond, peu importe où tourne le pod
+# zabbix-server. Plusieurs entrées = résilience si un nœud est down.
+zabbix_server_active: "10.42.0.11:31051,10.42.0.21:31051,10.42.0.22:31051"

@@ -1,0 +1,14 @@
+# Généré par Ansible (rôle zabbix-agent) — ne pas éditer à la main.
+#
+# Checks actifs uniquement (l'agent pousse vers le serveur) : plus simple à
+# travers WireGuard/le réseau interne qu'un accès entrant côté serveur vers
+# chaque hôte, et cohérent avec le NodePort trapper 10051 (jamais public,
+# cf. kubernetes/platform/zabbix/networkpolicy.yaml).
+Server=127.0.0.1
+ServerActive={{ zabbix_server_active }}
+Hostname={{ inventory_hostname }}
+
+LogType=console
+PidFile=/run/zabbix/zabbix_agent2.pid
+
+Include=/etc/zabbix/zabbix_agent2.d/*.conf

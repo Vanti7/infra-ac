@@ -1,5 +1,8 @@
 - name: Socle commun
-  hosts: all
+  # pve_host exclu : I13 (rôles Ansible hôte PVE) n'est pas encore fait, on
+  # ne fait pas converger stargate-px1 vers le rôle base en side-effect d'un
+  # ajout de zabbix-agent — portée volontairement limitée à ce qui est demandé.
+  hosts: all:!pve_host
   become: true
   roles:
     - base
@@ -35,7 +38,13 @@
     - k3s-agent
 
 - name: Résolution DNS interne (source NetBox)
-  hosts: all
+  hosts: all:!pve_host
   become: true
   roles:
     - dns-interne
+
+- name: Supervision Zabbix (agents actifs)
+  hosts: all
+  become: true
+  roles:
+    - zabbix-agent

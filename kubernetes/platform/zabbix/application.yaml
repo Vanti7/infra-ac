@@ -52,6 +52,11 @@ spec:
             nodePort: 31051
 
         zabbixWeb:
+          # SSO SAML Keycloak : le toolkit SAML embarqué exige idp.crt sur
+          # disque pour s'initialiser (sinon "idp_cert_or_fingerprint_not_
+          # found_and_required"), même avec sign_messages/sign_assertions à
+          # 0 côté config (userdirectory API, pas de champ certificat there).
+          samlCertsSecretName: zabbix-web-samlcerts
           resources:
             requests:
               cpu: 100m

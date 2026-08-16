@@ -1,0 +1,30 @@
+# Certificat de signature du realm Keycloak "infra" (clé PUBLIQUE — pas un
+# secret, safe en clair dans Git). Récupéré depuis
+# https://sso.aetheriscloud.fr/realms/infra/protocol/saml/descriptor.
+# Zabbix (toolkit SAML OneLogin) exige un fichier idp.crt monté sur disque
+# pour initialiser le SP, même quand sign_messages/sign_assertions sont à 0
+# côté API — sinon erreur "idp_cert_or_fingerprint_not_found_and_required".
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zabbix-web-samlcerts
+  namespace: zabbix
+type: Opaque
+stringData:
+  idp.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIICmTCCAYECBgGfxY31qjANBgkqhkiG9w0BAQsFADAQMQ4wDAYDVQQDDAVpbmZy
+    YTAeFw0yNjA4MDMwMjU1NDJaFw0zNjA4MDMwMjU3MjJaMBAxDjAMBgNVBAMMBWlu
+    ZnJhMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAv79LyUZQSnIr+RkO
+    L2iuKty8A5v/XmRLehzzgAejujzLilByocH41ycV4fzAU8C8VRcf7E0x0FBUco2C
+    AiNCwprZA/A5RQ3xSp7/2k/If8wkw5Lp5V99LKU43NIBsYmR1/9cK8JMgCBkO8ky
+    FGPon+xWe6t076sPikIhyzBQu+VwWE+EVnsNMRdUFswE0kiEfmdtXPSY8R7Vi6xX
+    nzW9sPwChc1JsU3vCL4aP0Zw5jW0NKha36KnJa1Zzx+DrWKM3tmmi3YGgOSks85Z
+    UFDYvqr9NfrQftDKNxdTbJUwjeP1TVPsz80K6Dcqfft3rSxGDzpHWgYMtGBu4NKz
+    IMa86wIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQBbmmVZHtGB7E1s/1CrOFM72BGJ
+    9Z/5UOyyNgEHRgFNWTvvjOSe6Z43M+gzfav1FHrvrmLckGv2pH8L2yjgBOUW7QYk
+    tV5z8eoF6fw/JdY4wu6Cfv9aOgqN88yDirgTrw0gsb3VI3EEy7c0/8jQfL54DN8Q
+    CYHstSOOyTmPI92uj6tK906ByvCF3x9FPzfL2CbG21guI7vwj9Yj/ScVoSRXer1e
+    DKdkuKJMxKKnPx40Mxgj08P+StQC/qwKa2H2EhPA5bERHrq3EHtG+4xWl3yRaHtS
+    vyQ2/SAFGY7iuVkuzEiiTQ8ZJDSa6CEQNjhZ7McXzafrj1UFaB74cs1MJN6w
+    -----END CERTIFICATE-----

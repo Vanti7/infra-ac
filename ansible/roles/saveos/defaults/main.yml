@@ -1,0 +1,50 @@
+# SaveOS (github.com/Vanti7/SaveOS) — projet maison, déployé ici pour être
+# testé comme moteur de sauvegarde candidat pour C2 (audit-infra-ac.md).
+# Décision PAS actée : on dogfoode pendant que l'infra est encore
+# personnelle/pré-client, la comparaison avec PBS/Veeam reste ouverte.
+#
+# Tourne sur le NAS maison, PAS dans k3s : un contrôleur de sauvegarde qui
+# vit sur la machine qu'il sauvegarde disparaît avec elle. Le NAS est déjà
+# la cible de stockage et il est hors-site par rapport au Dedibox.
+saveos_repo: "https://github.com/Vanti7/SaveOS.git"
+# Commit épinglé, pas `master` : sur un moteur de sauvegarde, savoir quelle
+# version tourne est nécessaire pour reproduire/diagnostiquer une
+# restauration. À bumper explicitement (même logique que M17 pour les images
+# maison). Branche par défaut du dépôt = master, pas main.
+saveos_version: "d5a21965e835e1cd399376bd6cc9a8c3ebf0caed"
+saveos_dir: "/opt/saveos"
+
+# Les données (dépôts Borg + objets MinIO) vont sur le sous-volume Btrfs,
+# jamais dans /var/lib/docker : la partition racine ne fait que 46 Go, les
+# volumes Docker par défaut du compose upstream la rempliraient et
+# planteraient l'OS. /mnt/tank fait 877 Go.
+saveos_data_dir: "/mnt/tank/backups/saveos"
+
+# Interface web et API : exposées sur le LAN maison + WireGuard (pas de
+# binding 0.0.0.0 pour Postgres/Redis, cf. override — ils n'ont aucune
+# raison d'être joignables de l'extérieur du host).
+saveos_web_port: 3000
+saveos_api_port: 8000
+saveos_minio_console_port: 9001
+
+# Les mots de passe associés (saveos_postgres_password,
+# saveos_minio_root_password) vivent chiffrés dans
+# group_vars/all/secrets.sops.yaml — générés sans caractères spéciaux
+# (`/`, `+`, `=`) : ils sont injectés dans DATABASE_URL, où ils casseraient
+# le parsing de l'URL.
+saveos_minio_root_user: "saveos"
+
+# Adresse par laquelle un navigateur/agent joint réellement ce host.
+# LAN maison par défaut ; 10.99.0.6 pour un accès via WireGuard.
+saveos_public_host: "10.10.0.50"
+
+# http tant que le Dockerfile.api d'upstream lance uvicorn sans les flags
+# --ssl-keyfile/--ssl-certfile (api/main.py ne configure le TLS que dans son
+# bloc __main__, jamais emprunté en mode Docker). Correctif en cours côté
+# projet SaveOS : passer à https une fois qu'il est en place — le
+# healthcheck du rôle suivra automatiquement.
+saveos_api_scheme: "http"
+
+# SSO : volontairement pas câblé ici. L'utilisateur intègre l'auth
+# directement dans le code de l'app (décision du 2026-08-18) — pas de
+# client Keycloak ni de reverse-proxy Teleport côté infra pour l'instant.

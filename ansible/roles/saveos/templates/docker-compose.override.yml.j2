@@ -1,0 +1,77 @@
+# Généré par Ansible (rôle saveos) — ne pas éditer à la main.
+#
+# Surcharge le docker-compose.yml upstream, laissé INTACT pour qu'un
+# `git pull` du dépôt SaveOS continue de s'appliquer sans conflit. Trois
+# écarts volontaires par rapport aux valeurs par défaut du projet :
+#
+#  1. Données sur /mnt/tank (Btrfs, 877 Go) au lieu de volumes Docker sur la
+#     partition racine (46 Go) : borg_repos et minio_data contiennent les
+#     sauvegardes elles-mêmes, ils rempliraient / et planteraient l'OS.
+#  2. Postgres et Redis bindés sur 127.0.0.1 : le compose upstream les publie
+#     sur 0.0.0.0, donc joignables depuis tout le LAN maison. Aucun besoin
+#     d'accès externe, ce sont des dépendances internes à la stack.
+#  3. Vrais mots de passe (SOPS) au lieu des saveos123/saveos123456 en dur.
+#
+# `!override` remplace la liste au lieu de la fusionner (compose >= 2.24) —
+# sans lui, les ports upstream 0.0.0.0 resteraient publiés EN PLUS des
+# nôtres. Vérifié après rendu par `docker compose config`.
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: "{{ saveos_postgres_password }}"
+    ports: !override
+      - "127.0.0.1:5432:5432"
+    volumes: !override
+      - {{ saveos_data_dir }}/postgres:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    ports: !override
+      - "127.0.0.1:6379:6379"
+    volumes: !override
+      - {{ saveos_data_dir }}/redis:/data
+
+  minio:
+    environment:
+      MINIO_ROOT_USER: "{{ saveos_minio_root_user }}"
+      MINIO_ROOT_PASSWORD: "{{ saveos_minio_root_password }}"
+    ports: !override
+      - "127.0.0.1:9000:9000"
+      - "{{ saveos_minio_console_port }}:9001"
+    volumes: !override
+      - {{ saveos_data_dir }}/minio:/data
+
+  api:
+    environment:
+      DATABASE_URL: "postgresql://saveos:{{ saveos_postgres_password }}@postgres:5432/saveos"
+      REDIS_URL: "redis://redis:6379/0"
+    # NOTE : l'API sert actuellement du HTTP en clair par le chemin Docker
+    # (Dockerfile.api lance uvicorn sans les flags --ssl-*, alors que
+    # api/main.py ne configure le TLS que dans son bloc __main__). Bug connu,
+    # correctif en cours côté projet SaveOS — volontairement PAS contourné
+    # ici, pour que ce déploiement reflète le comportement réel d'upstream.
+    # Quand le correctif sera en place : passer saveos_api_scheme à https.
+    ports: !override
+      - "{{ saveos_api_port }}:8000"
+    volumes: !override
+      - ./certs:/app/certs
+      - {{ saveos_data_dir }}/borg_repos:/tmp/borg_repos
+
+  worker:
+    environment:
+      DATABASE_URL: "postgresql://saveos:{{ saveos_postgres_password }}@postgres:5432/saveos"
+      REDIS_URL: "redis://redis:6379/0"
+    volumes: !override
+      - {{ saveos_data_dir }}/borg_repos:/tmp/borg_repos
+
+  web:
+    # NOTE : deux bugs connus non contournés ici (correctifs en cours côté
+    # projet SaveOS) — ce déploiement reflète volontairement le comportement
+    # réel d'upstream :
+    #  - NEXT_PUBLIC_API_URL=https://api:8000 n'est pas résolvable depuis un
+    #    navigateur (nom d'hôte interne Docker), donc l'interface ne peut pas
+    #    appeler l'API.
+    #  - le healthcheck teste /api/health qui n'existe pas → "unhealthy" à vie.
+    ports: !override
+      - "{{ saveos_web_port }}:3000"

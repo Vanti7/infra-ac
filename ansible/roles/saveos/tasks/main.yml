@@ -1,0 +1,96 @@
+- name: Vérifier que les secrets sont renseignés
+  ansible.builtin.assert:
+    that:
+      - saveos_postgres_password | length > 0
+      - saveos_minio_root_password | length > 0
+    fail_msg: >-
+      saveos_postgres_password et saveos_minio_root_password doivent être
+      définis dans group_vars/all/secrets.sops.yaml (voir ansible/README.md).
+
+- name: Installer git et openssl (clone du dépôt, génération des certs TLS)
+  ansible.builtin.apt:
+    name:
+      - git
+      - openssl
+    state: present
+    update_cache: true
+
+- name: "Cloner/mettre à jour SaveOS dans {{ saveos_dir }}"
+  ansible.builtin.git:
+    repo: "{{ saveos_repo }}"
+    dest: "{{ saveos_dir }}"
+    version: "{{ saveos_version }}"
+    # Le dépôt upstream reste intact : nos écarts vivent uniquement dans
+    # docker-compose.override.yml (untracked côté SaveOS), donc pas de
+    # conflit au pull. force:false pour ne jamais écraser une modif locale
+    # sans le vouloir.
+    force: false
+  register: saveos_git
+
+- name: Créer les répertoires de données sur le Btrfs
+  ansible.builtin.file:
+    path: "{{ saveos_data_dir }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - postgres
+    - redis
+    - minio
+    - borg_repos
+
+- name: Générer les certificats TLS self-signed de l'API
+  ansible.builtin.command: ./scripts/generate_certs.sh
+  args:
+    chdir: "{{ saveos_dir }}"
+    creates: "{{ saveos_dir }}/certs/cert.pem"
+
+- name: Déployer docker-compose.override.yml
+  ansible.builtin.template:
+    src: docker-compose.override.yml.j2
+    dest: "{{ saveos_dir }}/docker-compose.override.yml"
+    mode: "0600"
+  register: saveos_override
+
+# Garde-fou : si la fusion des deux compose ne donne pas ce qu'on croit
+# (notamment `!override` sur les ports, qui demande compose >= 2.24), on le
+# voit ICI et pas après avoir publié Postgres sur tout le LAN maison.
+- name: Valider la configuration compose fusionnée
+  ansible.builtin.command: docker compose config
+  args:
+    chdir: "{{ saveos_dir }}"
+  register: saveos_compose_config
+  changed_when: false
+
+- name: "Vérifier qu'aucun service interne n'est publié hors de localhost"
+  ansible.builtin.assert:
+    that:
+      - "'0.0.0.0:5432' not in saveos_compose_config.stdout"
+      - "'0.0.0.0:6379' not in saveos_compose_config.stdout"
+      - "'0.0.0.0:9000' not in saveos_compose_config.stdout"
+    fail_msg: >-
+      La fusion docker-compose a laissé Postgres/Redis/MinIO publiés sur
+      0.0.0.0 — `!override` n'a probablement pas été pris en compte
+      (docker compose trop ancien ?). Déploiement interrompu avant démarrage.
+
+- name: Construire les images
+  ansible.builtin.command: docker compose build
+  args:
+    chdir: "{{ saveos_dir }}"
+  when: saveos_git.changed or saveos_override.changed
+  changed_when: true
+
+- name: Démarrer la stack SaveOS
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ saveos_dir }}"
+  register: saveos_up
+  changed_when: "'Started' in saveos_up.stderr or 'Created' in saveos_up.stderr"
+
+- name: "Attendre que l'API réponde sur le port {{ saveos_api_port }}"
+  ansible.builtin.uri:
+    url: "{{ saveos_api_scheme }}://localhost:{{ saveos_api_port }}/health"
+    validate_certs: false
+  register: saveos_health
+  retries: 30
+  delay: 5
+  until: saveos_health.status == 200

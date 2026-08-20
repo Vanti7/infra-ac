@@ -1,0 +1,51 @@
+# Rôle générique (pas spécifique à SaveOS) : dépôt Docker officiel plutôt que
+# le paquet docker.io de Debian, pour avoir le plugin compose v2 (le `docker
+# compose config`/`!override` du rôle saveos en dépend) et des versions à jour.
+#
+# Clé récupérée en .asc (ASCII armored) et référencée directement via
+# signed-by : apt sait le lire tel quel, pas besoin du binaire gpg pour un
+# `dearmor` (absent d'un netinst minimal — déjà rencontré sur cet hôte).
+
+- name: Installer les prérequis
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+    update_cache: true
+
+- name: Créer /etc/apt/keyrings
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Télécharger la clé de signature Docker
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: Déclarer le dépôt Docker
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    content: |
+      deb [arch={{ docker_apt_arch }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable
+    mode: "0644"
+
+- name: Installer Docker Engine et le plugin compose
+  ansible.builtin.apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: true
+
+- name: Démarrer et activer docker
+  ansible.builtin.systemd:
+    name: docker
+    state: started
+    enabled: true

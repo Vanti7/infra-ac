@@ -1,11 +1,21 @@
 - name: Socle commun
-  # pve_host exclu : I13 (rôles Ansible hôte PVE) n'est pas encore fait, on
-  # ne fait pas converger stargate-px1 vers le rôle base en side-effect d'un
-  # ajout de zabbix-agent — portée volontairement limitée à ce qui est demandé.
+  # pve_host exclu en permanence, pas juste en attendant I13 : l'hyperviseur
+  # a son propre rôle dédié (base-pve, ci-dessous) — pas d'unattended-upgrades
+  # ni de chrony dessus (cf. base-pve/tasks/main.yml), volontairement
+  # différent du rôle base générique pour les VMs.
   hosts: all:!pve_host
   become: true
   roles:
     - base
+
+- name: "Hôte PVE — socle, firewall, WireGuard, HAProxy (I13)"
+  hosts: pve_host
+  become: true
+  roles:
+    - base-pve
+    - wireguard
+    - firewall
+    - haproxy
 
 - name: IAM Keycloak
   hosts: iam
@@ -20,7 +30,11 @@
     - teleport
 
 - name: Agents Teleport (ssh_service)
-  hosts: k3s_cluster:iam
+  # home_nas inclus : le shell du NAS passe par Teleport comme les autres
+  # hôtes (accès auditté/enregistré, plus de SSH par clé en direct). L'agent
+  # joint le cluster par le nom public teleport.aetheriscloud.fr:443, pas
+  # besoin que le NAS soit sur le réseau interne pour ça.
+  hosts: k3s_cluster:iam:home_nas
   become: true
   roles:
     - teleport-agent
@@ -38,10 +52,23 @@
     - k3s-agent
 
 - name: Résolution DNS interne (source NetBox)
-  hosts: all:!pve_host
+  # home_nas exclu comme pve_host : hôte hors NetBox, pas de sens à lui
+  # pousser une résolution DNS interne sourcée de là.
+  hosts: all:!pve_host:!home_nas
   become: true
   roles:
     - dns-interne
+
+- name: NAS maison — stockage Btrfs + partage (données + backups)
+  # Inerte tant qu'inventory/home-nas.yml n'est pas ajouté à ansible.cfg
+  # (cf. son en-tête) : "no hosts matched", pas d'erreur.
+  hosts: home_nas
+  become: true
+  roles:
+    - wireguard-client
+    - home-nas
+    - docker
+    - saveos
 
 - name: Supervision Zabbix (agents actifs)
   hosts: all

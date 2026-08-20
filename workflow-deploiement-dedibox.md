@@ -506,6 +506,44 @@ probes, `whoami` de test, CI, README racine).
 > existants, SSO SAML Keycloak (JIT provisioning). Mot de passe Admin par défaut pas
 > encore changé (reporté). Détail dans `exploitation.md`.
 
+> **I13 (2026-08-18)** : `stargate-px1` codifié en IaC — 4 rôles Ansible (`base-pve`,
+> `wireguard`, `firewall`, `haproxy`), écrits pour reproduire exactement l'état déjà en
+> place (Phase 1 ci-dessus), pas un nouveau durcissement. Validés en `--check --diff`
+> avant tout run réel vu le blast radius (point d'entrée unique). Tous les diffs réels
+> étaient cosmétiques (compteurs iptables à zéro, formatage WireGuard, en-têtes de
+> fichiers) — zéro changement de comportement. `base-pve` volontairement distinct du
+> rôle `base` (VMs) : pas d'unattended-upgrades ni de chrony sur l'hyperviseur.
+>
+> Un vrai bug trouvé en le faisant : `zabbix-agent` (déjà en prod sur cet hôte depuis
+> l'ajout de Zabbix ci-dessus) a échoué au replay avec `Network is unreachable` — cet
+> hôte n'a que de l'IPv6 link-local (pas de route v6 réelle), `apt` était déjà corrigé
+> à la main (`Acquire::ForceIPv4`, Phase 1.1) mais `get_url`/urllib (Python, utilisé
+> par `zabbix-agent`) tentait l'enregistrement AAAA en premier et échouait net au lieu
+> de retomber sur l'A. Corrigé dans `base-pve` via `/etc/gai.conf` (préférence IPv4,
+> RFC 6724) — codifie au passage le fix apt qui ne l'était pas encore. Vérifié après
+> coup par une connexion SSH neuve (pas la session ayant appliqué le changement) :
+> HAProxy/WireGuard/firewall/zabbix-agent2 actifs, handshake WireGuard confirmé, les 3
+> endpoints publics (argocd/sso/portail) répondant normalement.
+
+> **MFA Teleport — repli OTP (2026-08-19)** : signalé par l'utilisateur, incapable
+> de se connecter depuis un autre appareil que son Mac. Diagnostic : ce n'était pas
+> Keycloak (le compte `vanti` du realm `infra` a bien un credential OTP, aucune
+> passkey) mais **Teleport**, configuré en `second_factor: webauthn` — WebAuthn
+> exclusivement, aucun repli. Une passkey liée à la plateforme n'existant que sur la
+> machine qui l'a enregistrée, tout autre appareil était exclu ; et comme Teleport
+> garde ArgoCD/Grafana/Gitea/docs-internal/Zabbix, un seul portable perdu verrouillait
+> toute l'exploitation. Corrigé en `second_factors: ["webauthn", "otp"]` dans le rôle
+> Ansible (la config vient du fichier, `origin: config-file` — un `tctl` direct aurait
+> été écrasé au redémarrage). Reste à l'utilisateur d'enregistrer un TOTP
+> (`tsh mfa add`) depuis un appareil déjà authentifié.
+>
+> **Trouvé au passage** : `inventory/terraform.yml` ne porte aucun chemin de clé SSH —
+> le playbook ne marchait que si la clé était déjà dans l'agent SSH, donc pas sur un
+> checkout neuf (contredit I12). `private_key_file` fixé dans `ansible.cfg`.
+>
+> **Shell du NAS intégré à Teleport** le même jour (`hosts: k3s_cluster:iam:home_nas`),
+> détail dans `workflow-deploiement-nas-maison.md`.
+
 ---
 
 ## Dépendances entre phases

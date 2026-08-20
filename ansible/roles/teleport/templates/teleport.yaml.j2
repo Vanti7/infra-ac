@@ -7,7 +7,15 @@ auth_service:
   proxy_listener_mode: multiplex
   authentication:
     type: local
-    second_factor: webauthn
+    # WebAuthn reste le facteur principal (passkey, sans code à taper), mais
+    # l'OTP est accepté en repli : une passkey liée à la plateforme (Touch ID)
+    # n'existe que sur la machine qui l'a enregistrée. En `second_factor:
+    # webauthn` seul, tout appareil sans cette passkey était purement et
+    # simplement exclu — et comme Teleport garde ArgoCD/Grafana/Gitea/Zabbix,
+    # ça revenait à un point de défaillance unique sur un seul portable.
+    # `second_factors` (pluriel) est la forme v16+ ; `second_factor` au
+    # singulier est déprécié.
+    second_factors: ["webauthn", "otp"]
     webauthn:
       rp_id: {{ teleport_domain }}
 proxy_service:

@@ -27,6 +27,7 @@ un éditeur, ré-encrypte à la sauvegarde). Clés attendues :
 | `k3s_token` | `k3s-adm`, `k3s-agent` | pré-partagé, identique des deux côtés — générer avec `openssl rand -hex 32` |
 | `ghcr_pull_token` | `k3s-adm`, `k3s-agent` (`registries.yaml`, pull ghcr.io) | PAT GitHub `read:packages` uniquement (jamais le token d'écriture CI) |
 | `harbor_pull_token` | `k3s-adm`, `k3s-agent` (`registries.yaml`, pull Harbor) | Robot account Harbor pull-only, projet `aetheriscloud` (cf. `exploitation.md`) |
+| `home_nas_samba_password` | `home-nas` (compte Samba `home_nas_samba_user`) | à choisir à l'installation du NAS — pas encore renseigné (§ NAS maison ci-dessous) |
 
 Toutes les tâches qui manipulent ces variables directement (mot de passe Postgres,
 bootstrap admin Keycloak, token ACME Gandi, `config.yaml`/`registries.yaml` k3s, jeton
@@ -62,6 +63,37 @@ ponctuel uniquement, cf. son propre en-tête).
   n'est pas fait, `site.yml` exclut volontairement `pve_host` des plays `base` et
   `dns-interne` pour ne pas faire converger l'hyperviseur vers un rôle jamais
   pensé pour lui en side-effect d'un ajout ponctuel.
+- `inventory/home-nas.yml` : statique, même principe que `pve-host.yml` (hôte hors
+  NetBox). **Volontairement pas encore listé dans `inventory` ci-dessus** — voir
+  section "NAS maison" plus bas, c'est le dernier maillon à activer une fois la
+  machine installée.
+
+## NAS maison (`home_nas`)
+
+Rôle `home-nas` (ZFS + NFS + Samba) prêt et branché dans `site.yml`, mais **inerte**
+tant que la machine physique n'existe pas encore côté Ansible — au 2026-08-18, elle
+n'a même pas Debian installé. Rien ne s'exécute nulle part tant que les 3 étapes
+suivantes n'ont pas été faites, dans l'ordre, une fois l'accès SSH local obtenu :
+
+1. Renseigner `ansible_host` (et au besoin `ansible_ssh_private_key_file`) dans
+   `inventory/home-nas.yml`.
+2. Renseigner `home_nas_zpool_disks` (chemins `/dev/disk/by-id/...`, sans le
+   préfixe), `home_nas_samba_allowed_network` et `home_nas_samba_user` dans
+   `group_vars/home_nas.yml`, plus `home_nas_samba_password` dans
+   `group_vars/all/secrets.sops.yaml`. Le rôle refuse de tourner (assert) tant
+   que les 3 premières sont vides.
+3. Ajouter `,inventory/home-nas.yml` à la ligne `inventory` de `ansible.cfg`.
+
+Stockage actuel : 1 disque de 1To (vdev simple, `home_nas_zpool_mode: ""`, aucune
+redondance — même situation que C2 côté Dedibox). 2 disques Dell 600G 15K rpm
+possédés mais pas encore câblés ; une fois branchés, ils sont prévus en **mirror
+séparé** (pas mélangés avec le 1To, tailles/vitesses trop différentes), via
+`zpool attach` — pas de perte de données ni de rebuild complet du pool existant.
+
+Le partage NFS (données + backups, vers les serveurs de l'infra) suppose que ce
+NAS a rejoint le réseau de management WireGuard (10.99.0.0/24) — pas encore le
+cas, ça dépend de I13 (rôle `wireguard`, pas écrit). Le partage Samba (poste perso,
+LAN) est indépendant de ça et fonctionnera dès l'installation.
 
 ## Premier lancement
 

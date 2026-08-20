@@ -1,0 +1,4 @@
+- name: redémarrer haproxy
+  ansible.builtin.systemd:
+    name: haproxy
+    state: restarted

@@ -1,0 +1,20 @@
+# I13 (audit) : codifie le wg0 déjà en place sur stargate-px1 (voir
+# workflow-deploiement-dedibox.md Phase 1.3). Clés publiques des peers —
+# pas secrètes, ok en clair ici. La clé privée du serveur
+# (wireguard_server_private_key) vit dans group_vars/all/secrets.sops.yaml.
+wireguard_address: "10.99.0.1/24"
+wireguard_listen_port: 51820
+
+wireguard_peers:
+  - name: "poste admin (Mac) — accès direct"
+    public_key: "iuNfbVJnDrLRYA6GL0qqjeteXiQEYNedMhHvA+XO2VA="
+    allowed_ips: "10.99.0.3/32"
+  - name: "PC boulot"
+    public_key: "OmJ6FdROrMZuBh7PnVfK4tZKnc3/xblEHnCFCxOwb3w="
+    allowed_ips: "10.99.0.4/32"
+  - name: "Téléphone"
+    public_key: "E93IwqhPPJCuz292uocKWUmNafRX+dhLXQmAXQOAyTI="
+    allowed_ips: "10.99.0.5/32"
+  - name: "NAS maison (nas-maison, généré par le rôle wireguard-client)"
+    public_key: "j57HxpBtIh4vrMi6amPMibXWY3ED3qywcbL+eYm6XB4="
+    allowed_ips: "10.99.0.6/32"

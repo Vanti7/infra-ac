@@ -1,0 +1,82 @@
+# I13 (audit) : codifie l'état déjà en place sur stargate-px1 (voir
+# workflow-deploiement-dedibox.md Phase 1), pas un nouveau durcissement.
+# Volontairement PAS un doublon du rôle `base` (VMs) : pas
+# d'unattended-upgrades ni de chrony ici (aucun des deux n'est actif sur
+# l'hyperviseur aujourd'hui — PVE gère son propre cycle de mise à jour,
+# un reboot involontaire sur l'unique point d'entrée n'est pas souhaitable
+# sans y avoir réfléchi séparément). Node_exporter et le durcissement sshd,
+# eux, sont déjà en place et repris tels quels.
+
+# Cet hôte n'a que de l'IPv6 link-local (fe80::...), aucune route v6 réelle
+# — mais `repo.zabbix.com` (et d'autres) publient quand même un AAAA. Sans
+# ces deux réglages, tout outil qui suit l'ordre RFC 6724 (préfère IPv6)
+# tente l'AAAA et échoue immédiatement ("Network is unreachable") au lieu
+# de retomber sur l'A qui, lui, marche. `apt` était déjà corrigé à la main
+# (Phase 1) ; `get_url`/urllib (zabbix-agent) ne l'était pas — découvert en
+# écrivant ce rôle (le play zabbix-agent a échoué dessus, cf. I13).
+- name: "apt — forcer IPv4 (host sans IPv6 routé, seulement link-local)"
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/99force-ipv4
+    content: |
+      Acquire::ForceIPv4 "true";
+    mode: "0644"
+
+- name: "getaddrinfo — préférer IPv4 (corrige get_url/urllib qui tentent l'AAAA en premier)"
+  ansible.builtin.lineinfile:
+    path: /etc/gai.conf
+    regexp: '^precedence ::ffff:0:0/96'
+    line: "precedence ::ffff:0:0/96  100"
+
+- name: "sshd — désactiver l'authentification par mot de passe"
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: "PasswordAuthentication no"
+  notify: redémarrer sshd
+
+- name: "sshd — pas de login root par mot de passe"
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: "PermitRootLogin prohibit-password"
+  notify: redémarrer sshd
+
+- name: Créer l'utilisateur système node_exporter
+  ansible.builtin.user:
+    name: node_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Télécharger et extraire node_exporter
+  ansible.builtin.unarchive:
+    src: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: true
+    creates: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+
+- name: Installer le binaire node_exporter
+  ansible.builtin.copy:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+    dest: /usr/local/bin/node_exporter
+    mode: "0755"
+    remote_src: true
+    owner: node_exporter
+    group: node_exporter
+  notify: redémarrer node_exporter
+
+- name: Déployer l'unité systemd node_exporter
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    mode: "0644"
+  notify:
+    - recharger systemd
+    - redémarrer node_exporter
+
+- name: Démarrer et activer node_exporter
+  ansible.builtin.systemd:
+    name: node_exporter
+    state: started
+    enabled: true
+    daemon_reload: true

@@ -1,0 +1,20 @@
+- name: Installer iptables-persistent / netfilter-persistent
+  ansible.builtin.apt:
+    name:
+      - iptables-persistent
+      - netfilter-persistent
+    state: present
+    update_cache: true
+
+- name: Déployer le ruleset IPv4 (/etc/iptables/rules.v4)
+  ansible.builtin.template:
+    src: rules.v4.j2
+    dest: /etc/iptables/rules.v4
+    mode: "0644"
+  notify: recharger les règles iptables
+
+- name: Activer et démarrer netfilter-persistent
+  ansible.builtin.systemd:
+    name: netfilter-persistent
+    state: started
+    enabled: true

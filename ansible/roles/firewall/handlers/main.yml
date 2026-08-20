@@ -1,0 +1,8 @@
+# Les compteurs de paquets varient à chaque exécution (template régénéré
+# avec des compteurs à zéro, normal) — "changed" quasi systématique sur la
+# tâche template, sans conséquence : le ruleset réel, lui, ne change que si
+# les règles elles-mêmes diffèrent. Reload sans risque, toujours la même
+# politique DROP par défaut.
+- name: recharger les règles iptables
+  ansible.builtin.command: netfilter-persistent reload
+  changed_when: true

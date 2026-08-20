@@ -1,0 +1,36 @@
+# Généré par Ansible (rôle haproxy) — ne pas éditer à la main.
+global
+    log /dev/log local0
+
+defaults
+    log     global
+    mode    tcp
+    option  tcplog
+    timeout connect 5s
+    timeout client  1h
+    timeout server  1h
+
+frontend fe443
+    bind :443
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req_ssl_hello_type 1 }
+    use_backend bk_teleport if { req_ssl_sni -i teleport.aetheriscloud.fr }
+    use_backend bk_teleport if { req_ssl_sni -m end -i .teleport.cluster.local }
+    use_backend bk_teleport if { req_ssl_sni -m end -i .ops.aetheriscloud.fr }
+    use_backend bk_sso      if { req_ssl_sni -i sso.aetheriscloud.fr }
+    use_backend bk_kubeapi  if { req_ssl_sni -i kube.aetheriscloud.fr }
+    default_backend bk_ingress
+
+backend bk_teleport
+    server teleport {{ haproxy_backend_teleport }} check
+
+backend bk_sso
+    server iam {{ haproxy_backend_sso }} check send-proxy-v2
+
+backend bk_kubeapi
+    server k3s {{ haproxy_backend_kubeapi }} check
+
+backend bk_ingress
+{% for b in haproxy_backend_ingress %}
+    server {{ b.name }} {{ b.address }} check send-proxy-v2
+{% endfor %}

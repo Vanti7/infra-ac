@@ -1,0 +1,11 @@
+# I13 (audit) : codifie le haproxy.cfg déjà en place sur stargate-px1 (voir
+# workflow-deploiement-dedibox.md Phase 1.5). Routage SNI, TCP passthrough
+# — HAProxy ne voit jamais le trafic en clair, juste le SNI du ClientHello.
+haproxy_backend_teleport: "10.42.0.5:443"
+haproxy_backend_sso: "10.42.0.6:443"
+haproxy_backend_kubeapi: "10.42.0.11:6443"
+haproxy_backend_ingress:
+  - name: w1
+    address: "10.42.0.21:443"
+  - name: w2
+    address: "10.42.0.22:443"

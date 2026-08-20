@@ -1,0 +1,20 @@
+- name: Installer WireGuard
+  ansible.builtin.apt:
+    name:
+      - wireguard
+      - wireguard-tools
+    state: present
+    update_cache: true
+
+- name: Déployer /etc/wireguard/wg0.conf
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: "0600"
+  notify: redémarrer wg-quick@wg0
+
+- name: Démarrer et activer wg-quick@wg0
+  ansible.builtin.systemd:
+    name: wg-quick@wg0
+    state: started
+    enabled: true

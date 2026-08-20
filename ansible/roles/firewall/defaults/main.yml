@@ -1,0 +1,8 @@
+# I13 (audit) : codifie le ruleset iptables déjà en place sur stargate-px1
+# (voir workflow-deploiement-dedibox.md Phase 1.4), pas un nouveau
+# durcissement. Politique DROP par défaut sur INPUT, testée en conditions
+# réelles à l'origine (SSH/8006 publics → timeout ; via WG → OK).
+firewall_wan_iface: "vmbr0"
+firewall_lan_network: "10.42.0.0/24"
+firewall_mgmt_network: "10.99.0.0/24"
+firewall_wireguard_port: 51820

@@ -3,3 +3,5 @@ collections:
   - name: netbox.netbox
   - name: community.sops
     version: ">=2.0.0"
+  - name: ansible.posix
+    version: ">=2.0.0"

@@ -1,0 +1,48 @@
+# --- Btrfs ---
+# ZFS écarté (2026-08-18) : module DKMS tiers, jamais signé par Debian
+# (licence CDDL), bloqué par le Secure Boot du firmware ASUS de cette
+# machine — bug firmware qui empêche même l'enrôlement MOK (variable EFI
+# SecureBoot invisible en runtime alors que le noyau la voit au boot).
+# Btrfs est intégré et signé avec le noyau Debian officiel : aucun souci de
+# Secure Boot, testé et confirmé sur cette machine (`modprobe btrfs` direct).
+#
+# Pas de valeur par défaut sûre pour le disque : à renseigner dans
+# group_vars/home_nas.yml. ID SANS le préfixe (le rôle ajoute
+# /dev/disk/by-id/ automatiquement) — jamais /dev/sdX, qui peut changer
+# d'ordre au reboot. `ls -l /dev/disk/by-id/` sur l'hôte pour l'obtenir
+# (c'est la 4e partition, celle laissée "ne pas utiliser" à l'install :
+# boot/swap/root prennent les 3 premières).
+home_nas_btrfs_label: "tank"
+home_nas_btrfs_disk: ""
+
+# Un seul disque pour l'instant (aucune redondance — même situation que le
+# Dedibox tant qu'un 2e disque n'est pas câblé, cf. C2/audit-infra-ac.md).
+# Les 2 disques Dell 600G 15K rejoindront un filesystem Btrfs SÉPARÉ en
+# raid1 une fois câblés (`btrfs device add` + `btrfs balance
+# -dconvert=raid1 -mconvert=raid1`) — pas mélangés avec celui-ci, tailles/
+# vitesses trop différentes.
+home_nas_subvolumes:
+  - data
+  - backups
+
+# --- NFS (accès serveurs de l'infra, via WireGuard) ---
+# Les deux réseaux comptent : les serveurs (nœuds k3s, CT) vivent sur
+# 10.42.0.0/24, pas sur 10.99.0.0/24 (management WG uniquement) — le trafic
+# NFS depuis un nœud n'est pas NATé vers le tunnel, il garde son IP réelle
+# 10.42.0.x. Découvert le 2026-08-18 en testant un vrai montage depuis
+# k3s-adm ("access denied by server", corrigé après coup).
+home_nas_nfs_allowed_networks:
+  - "10.42.0.0/24"
+  - "10.99.0.0/24"
+
+# --- Samba (accès LAN, postes perso) ---
+# Pas de valeur par défaut sûre : dépend du LAN maison. À renseigner dans
+# group_vars/home_nas.yml (ex: "192.168.1.0/24").
+home_nas_samba_allowed_network: ""
+home_nas_samba_workgroup: "WORKGROUP"
+
+# Compte Unix/Samba dédié (pas root, pas de shell, nomenclature svc-). Le
+# mot de passe associé (home_nas_samba_password) vit dans
+# group_vars/all/secrets.sops.yaml, jamais ici en clair — voir
+# ansible/README.md.
+home_nas_samba_user: ""

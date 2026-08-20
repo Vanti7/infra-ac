@@ -1,0 +1,152 @@
+- name: Vérifier que les variables obligatoires sont renseignées
+  ansible.builtin.assert:
+    that:
+      - home_nas_btrfs_disk | length > 0
+      - home_nas_samba_allowed_network | length > 0
+      - home_nas_samba_user | length > 0
+    fail_msg: >-
+      home_nas_btrfs_disk, home_nas_samba_allowed_network et
+      home_nas_samba_user doivent être renseignés dans
+      group_vars/home_nas.yml avant de jouer ce rôle (voir ansible/README.md,
+      section "NAS maison").
+
+# --- Btrfs ---
+
+- name: Installer btrfs-progs
+  ansible.builtin.apt:
+    name: btrfs-progs
+    state: present
+    update_cache: true
+
+- name: Vérifier si la partition est déjà formatée en btrfs
+  ansible.builtin.command: "blkid -o value -s TYPE /dev/disk/by-id/{{ home_nas_btrfs_disk }}"
+  register: home_nas_blkid_check
+  changed_when: false
+  failed_when: false
+
+- name: "Formater en btrfs (label {{ home_nas_btrfs_label }})"
+  ansible.builtin.command: "mkfs.btrfs -L {{ home_nas_btrfs_label }} /dev/disk/by-id/{{ home_nas_btrfs_disk }}"
+  when: home_nas_blkid_check.stdout != "btrfs"
+  changed_when: true
+
+- name: Créer le point de montage temporaire du volume racine
+  ansible.builtin.file:
+    path: /mnt/btrfs-root
+    state: directory
+    mode: "0755"
+
+- name: Monter temporairement le volume racine (pour créer les sous-volumes)
+  ansible.posix.mount:
+    path: /mnt/btrfs-root
+    src: "LABEL={{ home_nas_btrfs_label }}"
+    fstype: btrfs
+    state: mounted
+
+- name: Vérifier les sous-volumes existants
+  ansible.builtin.command: btrfs subvolume list /mnt/btrfs-root
+  register: home_nas_subvol_check
+  changed_when: false
+
+- name: "Créer les sous-volumes ({{ home_nas_subvolumes | join(', ') }})"
+  ansible.builtin.command: "btrfs subvolume create /mnt/btrfs-root/{{ item }}"
+  loop: "{{ home_nas_subvolumes }}"
+  when: ('path ' ~ item) not in home_nas_subvol_check.stdout
+  changed_when: true
+
+- name: Démonter le volume racine temporaire
+  ansible.posix.mount:
+    path: /mnt/btrfs-root
+    state: unmounted
+
+- name: "Créer les points de montage définitifs (/mnt/{{ home_nas_btrfs_label }}/...)"
+  ansible.builtin.file:
+    path: "/mnt/{{ home_nas_btrfs_label }}/{{ item }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ home_nas_subvolumes }}"
+
+- name: Monter durablement chaque sous-volume (fstab, compression zstd)
+  ansible.posix.mount:
+    path: "/mnt/{{ home_nas_btrfs_label }}/{{ item }}"
+    src: "LABEL={{ home_nas_btrfs_label }}"
+    fstype: btrfs
+    opts: "subvol={{ item }},compress=zstd"
+    state: mounted
+  loop: "{{ home_nas_subvolumes }}"
+
+# root_squash (voulu, cf. exports.j2) mappe le root distant sur nobody — sans
+# ça, aucun client NFS ne peut écrire. 0777 en attendant un vrai compte de
+# service (dépend du moteur de backup, pas encore choisi) : l'accès réseau
+# est déjà restreint à 10.42.0.0/24 et 10.99.0.0/24, cf. exports.j2. À
+# resserrer une fois un compte de service identifié. Chmod la racine réelle
+# du sous-volume monté, pas le point de montage vide (l'ordre des tâches
+# compte : après le montage, pas avant).
+- name: "Ouvrir l'écriture aux clients NFS (root_squash + UID distant inconnu pour l'instant)"
+  ansible.builtin.file:
+    path: "/mnt/{{ home_nas_btrfs_label }}/{{ item }}"
+    state: directory
+    mode: "0777"
+  loop: "{{ home_nas_subvolumes }}"
+
+# --- NFS (serveurs de l'infra, via WireGuard) ---
+
+- name: Installer nfs-kernel-server
+  ansible.builtin.apt:
+    name: nfs-kernel-server
+    state: present
+
+- name: Déployer /etc/exports
+  ansible.builtin.template:
+    src: exports.j2
+    dest: /etc/exports
+    mode: "0644"
+  notify: réexporter NFS
+
+- name: Démarrer et activer nfs-kernel-server
+  ansible.builtin.systemd:
+    name: nfs-kernel-server
+    state: started
+    enabled: true
+
+# --- Samba (postes perso, LAN) ---
+
+- name: Installer Samba
+  ansible.builtin.apt:
+    name: samba
+    state: present
+
+- name: "Créer l'utilisateur Unix (partage Samba) : {{ home_nas_samba_user }}"
+  ansible.builtin.user:
+    name: "{{ home_nas_samba_user }}"
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Vérifier si le compte Samba existe déjà
+  ansible.builtin.command: pdbedit -L
+  register: home_nas_samba_check
+  changed_when: false
+  failed_when: false
+
+- name: "Définir le mot de passe Samba : {{ home_nas_samba_user }}"
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      (echo '{{ home_nas_samba_password }}'; echo '{{ home_nas_samba_password }}') | smbpasswd -a -s {{ home_nas_samba_user }}
+    executable: /bin/bash
+  when: home_nas_samba_user not in home_nas_samba_check.stdout
+  no_log: true
+  changed_when: true
+
+- name: Déployer /etc/samba/smb.conf
+  ansible.builtin.template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+    mode: "0644"
+  notify: redémarrer samba
+
+- name: Démarrer et activer smbd
+  ansible.builtin.systemd:
+    name: smbd
+    state: started
+    enabled: true

@@ -1,0 +1,11 @@
+# Rejoint le réseau de management WireGuard (10.99.0.0/24) du serveur codifié
+# par le rôle `wireguard`. La clé privée est générée SUR la machine et n'en
+# sort jamais — rien à mettre dans secrets.sops.yaml pour ce rôle. La clé
+# publique générée doit être ajoutée manuellement à `wireguard_peers` dans
+# roles/wireguard/defaults/main.yml (ou un group_vars qui la surcharge) côté
+# serveur — affichée en clair à la fin du run pour copier-coller.
+wireguard_client_address: ""
+wireguard_client_server_public_key: ""
+wireguard_client_server_endpoint: "aetheriscloud.fr:51820"
+wireguard_client_allowed_ips: "10.42.0.0/24,10.99.0.0/24"
+wireguard_client_persistent_keepalive: 25

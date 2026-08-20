@@ -1,0 +1,13 @@
+# NAS maison — sert la supervision Zabbix du futur NAS et le stockage
+# (données + cible backup) discuté dans audit-infra-ac.md (C2). Statique
+# comme pve-host.yml : ce n'est pas une VM/LXC Proxmox, NetBox ne peut pas
+# le connaître.
+#
+# ansible_host en IP fixe DHCP (réservation .50 côté box, 2026-08-18) — pas
+# une IP publique/routable, LAN maison uniquement pour l'instant (10.10.0.0/24).
+"home_nas":
+  "hosts":
+    "nas-maison":
+      "ansible_host": "10.10.0.50"
+      "ansible_user": "root"
+      "ansible_ssh_private_key_file": "../secrets/ssh/home_nas_root"

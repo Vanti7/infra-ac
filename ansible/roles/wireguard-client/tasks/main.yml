@@ -1,0 +1,64 @@
+- name: Vérifier que les variables obligatoires sont renseignées
+  ansible.builtin.assert:
+    that:
+      - wireguard_client_address | length > 0
+      - wireguard_client_server_public_key | length > 0
+    fail_msg: >-
+      wireguard_client_address et wireguard_client_server_public_key doivent
+      être renseignés avant de jouer ce rôle.
+
+- name: Installer WireGuard
+  ansible.builtin.apt:
+    name:
+      - wireguard
+      - wireguard-tools
+    state: present
+    update_cache: true
+
+- name: Vérifier si une paire de clés existe déjà
+  ansible.builtin.stat:
+    path: /etc/wireguard/privatekey
+  register: wireguard_client_privkey_stat
+
+- name: Générer la paire de clés (la clé privée ne quitte jamais la machine)
+  ansible.builtin.shell:
+    cmd: |
+      set -o pipefail
+      umask 077
+      wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey
+    executable: /bin/bash
+  when: not wireguard_client_privkey_stat.stat.exists
+  changed_when: true
+
+- name: Sécuriser les permissions de la clé privée
+  ansible.builtin.file:
+    path: /etc/wireguard/privatekey
+    mode: "0600"
+
+- name: Lire la clé privée générée
+  ansible.builtin.slurp:
+    src: /etc/wireguard/privatekey
+  register: wireguard_client_privkey_slurp
+  no_log: true
+
+- name: Lire la clé publique générée
+  ansible.builtin.slurp:
+    src: /etc/wireguard/publickey
+  register: wireguard_client_pubkey_slurp
+
+- name: Déployer /etc/wireguard/wg0.conf
+  ansible.builtin.template:
+    src: wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    mode: "0600"
+  notify: redémarrer wg-quick@wg0
+
+- name: Démarrer et activer wg-quick@wg0
+  ansible.builtin.systemd:
+    name: wg-quick@wg0
+    state: started
+    enabled: true
+
+- name: Afficher la clé publique (à ajouter côté serveur, wireguard_peers)
+  ansible.builtin.debug:
+    msg: "Clé publique WireGuard de cet hôte : {{ wireguard_client_pubkey_slurp.content | b64decode | trim }}"

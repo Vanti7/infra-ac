@@ -1,0 +1,11 @@
+# Généré par Ansible (rôle home-nas) — ne pas éditer à la main.
+#
+# 10.42.0.0/24 (serveurs/nœuds k3s, pas NATés vers le tunnel WG — gardent
+# leur IP réelle) + 10.99.0.0/24 (peers WireGuard management directs). Accès
+# uniquement via WireGuard dans les deux cas (cf. I13 dans audit-infra-ac.md).
+# no_root_squash volontairement absent : les montages côté serveurs se font
+# via des comptes de service dédiés, jamais root.
+{% for sv in home_nas_subvolumes %}
+/mnt/{{ home_nas_btrfs_label }}/{{ sv }} {% for net in home_nas_nfs_allowed_networks %}{{ net }}(rw,sync,no_subtree_check){{ " " if not loop.last }}{% endfor %}
+
+{% endfor %}

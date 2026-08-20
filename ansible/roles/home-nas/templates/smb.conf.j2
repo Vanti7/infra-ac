@@ -1,0 +1,15 @@
+# Généré par Ansible (rôle home-nas) — ne pas éditer à la main.
+
+[global]
+   workgroup = {{ home_nas_samba_workgroup }}
+   server string = NAS maison (aetheriscloud)
+   security = user
+   map to guest = never
+   hosts allow = {{ home_nas_samba_allowed_network }} 127.0.0.1
+   hosts deny = 0.0.0.0/0
+
+[data]
+   path = /mnt/{{ home_nas_btrfs_label }}/data
+   browseable = yes
+   read only = no
+   valid users = {{ home_nas_samba_user }}

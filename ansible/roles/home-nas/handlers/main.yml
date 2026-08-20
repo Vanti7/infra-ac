@@ -1,0 +1,8 @@
+- name: réexporter NFS
+  ansible.builtin.command: exportfs -ra
+  changed_when: true
+
+- name: redémarrer samba
+  ansible.builtin.systemd:
+    name: smbd
+    state: restarted

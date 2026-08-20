@@ -1,0 +1,22 @@
+# home_nas — voir ansible/README.md, section "NAS maison". Le rôle refuse de
+# tourner (assert) tant que ces variables sont vides.
+
+# Disque unique pour l'instant : SSD Crucial BX500 1To (SATA), partition 4
+# (celle laissée "ne pas utiliser" à l'install, cf. sda1-3 = boot/swap/root).
+# Les 2 disques Dell 600G 15K rejoindront leur propre filesystem Btrfs en
+# raid1 une fois câblés, pas mélangés avec celui-ci.
+home_nas_btrfs_disk: "ata-CT1000BX500SSD1_2308E6B2647C-part4"
+
+# LAN maison (confirmé sur l'hôte, 2026-08-18).
+home_nas_samba_allowed_network: "10.10.0.0/24"
+
+# Compte de service dédié (nomenclature svc- pour tous les comptes de
+# service de l'infra). Mot de passe associé (home_nas_samba_password) dans
+# group_vars/all/secrets.sops.yaml, jamais ici en clair.
+home_nas_samba_user: "svc-nas-share"
+
+# Rejoint le réseau de management WireGuard (I13). .1=serveur, .3/.4/.5 déjà
+# pris (Mac/PC boulot/téléphone) — .6 suivant de libre. Clé publique serveur
+# lue via `wg show wg0` sur stargate-px1 après le déploiement I13.
+wireguard_client_address: "10.99.0.6/24"
+wireguard_client_server_public_key: "r1rwazcM1zjt+GV/zyMw3c7e0M28j1VmuO+dYXiX1Uc="
